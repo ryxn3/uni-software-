@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DEVTERM // peripheral configuration shell</title>
+<meta name="description" content="A terminal-styled configuration console for gaming mice and keyboards — DPI, polling rate, macros, RGB, actuation point and SOCD/snap-tap." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22 fill=%22%2339ff6a%22>&gt;_</text></svg>" />
+<link rel="stylesheet" href="assets/css/style.css" />
+</head>
+<body>
+<div class="crt flicker" id="crt">
+
+  <!-- BOOT SEQUENCE -->
+  <div id="boot-screen"></div>
+
+  <!-- MAIN TERMINAL -->
+  <div id="terminal" class="hidden">
+    <div class="titlebar">
+      <div class="dots"><span></span><span></span><span></span>
+        <span style="margin-left:.6em" class="path">guest@devterm:~/peripherals</span>
+      </div>
+      <div class="status">
+        <span class="dot on" id="status-dot"></span><span id="status-text">2 DEVICES LINKED</span>
+      </div>
+    </div>
+
+    <nav id="nav">
+      <button data-screen="devices" class="active">[1] DEVICES</button>
+      <button data-screen="mouse">[2] MOUSE</button>
+      <button data-screen="keyboard">[3] KEYBOARD</button>
+      <button data-screen="macros">[4] MACROS</button>
+      <button data-screen="profiles">[5] PROFILES</button>
+      <button data-screen="about">[6] ABOUT</button>
+    </nav>
+
+    <main id="screen-container">
+
+      <!-- DEVICES -->
+      <section class="screen active" id="screen-devices">
+        <h1>&gt; DEVICE MANAGER</h1>
+        <p class="dim">Detected peripherals from the supported-driver catalog (Razer / Logitech / MCHOSE). Click a card to select it as the active MOUSE or KEYBOARD target.</p>
+
+        <div class="panel">
+          <span class="panel-title">mice</span><span class="cbl"></span><span class="cbr"></span>
+          <div class="grid-cards" id="mice-cards"></div>
+        </div>
+
+        <div class="panel">
+          <span class="panel-title">keyboards</span><span class="cbl"></span><span class="cbr"></span>
+          <div class="grid-cards" id="kbd-cards"></div>
+        </div>
+
+        <div class="panel">
+          <span class="panel-title">webhid live scan (experimental)</span><span class="cbl"></span><span class="cbr"></span>
+          <p class="small dim">Attempts a real browser WebHID request. Most vendor drivers block raw feature-report access from the web, so this only reports what the OS exposes (vendor/product ID) — it will not overwrite the simulated profiles above.</p>
+          <div class="actions">
+            <button id="btn-webhid-scan">RUN WEBHID SCAN</button>
+            <span id="webhid-support" class="small dim"></span>
+          </div>
+          <div id="webhid-result" class="log mt" style="display:none;"></div>
+        </div>
+      </section>
+
+      <!-- MOUSE -->
+      <section class="screen" id="screen-mouse">
+        <h1>&gt; MOUSE CONFIGURATION <span id="mouse-active-name" class="dim"></span></h1>
+
+        <div class="panel-grid">
+          <div class="panel">
+            <span class="panel-title">dpi stages</span><span class="cbl"></span><span class="cbr"></span>
+            <div id="dpi-stages"></div>
+            <div class="actions">
+              <button id="dpi-add">+ ADD STAGE</button>
+              <button id="dpi-remove">- REMOVE LAST</button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <span class="panel-title">polling rate</span><span class="cbl"></span><span class="cbr"></span>
+            <div class="field">
+              <label for="mouse-polling">Report Rate (Hz)</label>
+              <select id="mouse-polling"></select>
+            </div>
+            <p class="small dim" id="mouse-polling-note"></p>
+            <div class="field">
+              <label for="mouse-lod">Lift-Off Distance (mm): <span id="lod-val" class="val"></span></label>
+              <input type="range" id="mouse-lod" min="1" max="4" step="1" />
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <span class="panel-title">button mapping</span><span class="cbl"></span><span class="cbr"></span>
+          <table class="mono-table" id="button-map-table">
+            <thead><tr><th>Button</th><th>Function</th><th>Macro / Keystroke</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <div class="panel">
+          <span class="panel-title">snap tap / socd (movement buttons)</span><span class="cbl"></span><span class="cbr"></span>
+          <p class="small dim">Enable to apply opposite-direction input resolution when mouse side-buttons are bound to movement keystrokes. Full pair configuration lives on the KEYBOARD screen.</p>
+          <div class="row">
+            <label>Snap Tap Enabled</label>
+            <button id="mouse-socd-toggle" class="badge">OFF</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- KEYBOARD -->
+      <section class="screen" id="screen-keyboard">
+        <h1>&gt; KEYBOARD CONFIGURATION <span id="kbd-active-name" class="dim"></span></h1>
+
+        <div class="panel">
+          <span class="panel-title">polling rate</span><span class="cbl"></span><span class="cbr"></span>
+          <div class="field">
+            <label for="kbd-polling">Report Rate (Hz)</label>
+            <select id="kbd-polling"></select>
+          </div>
+        </div>
+
+        <div class="panel" id="panel-actuation">
+          <span class="panel-title">actuation point &amp; key layout</span><span class="cbl"></span><span class="cbr"></span>
+          <p class="small dim" id="analog-note"></p>
+          <div class="kb-wrap" id="kb-layout"></div>
+          <div class="row mt">
+            <label>Selected Key: <b id="sel-key">—</b></label>
+          </div>
+          <div class="field">
+            <label for="ap-slider">Actuation Point (mm): <span id="ap-val" class="val"></span></label>
+            <input type="range" id="ap-slider" min="0.1" max="4.0" step="0.05" />
+          </div>
+          <div class="actions">
+            <button id="ap-apply-all">APPLY TO ALL KEYS</button>
+            <button id="ap-reset">RESET KEY</button>
+          </div>
+
+          <hr class="sep" />
+          <h3>Rapid Trigger</h3>
+          <div class="row">
+            <label>Enabled</label>
+            <button id="rt-toggle" class="badge">OFF</button>
+          </div>
+          <div class="field">
+            <label for="rt-sens">Reset Sensitivity (mm): <span id="rt-sens-val" class="val"></span></label>
+            <input type="range" id="rt-sens" min="0.05" max="1.0" step="0.05" />
+          </div>
+          <div class="field">
+            <label for="rt-init">Initial Trigger Travel (mm): <span id="rt-init-val" class="val"></span></label>
+            <input type="range" id="rt-init" min="0.1" max="2.0" step="0.05" />
+          </div>
+        </div>
+
+        <div class="panel" id="panel-keytest">
+          <span class="panel-title">key press test</span><span class="cbl"></span><span class="cbr"></span>
+          <p class="small dim">Click into the field below and press keys on your real keyboard. Browsers cannot read analog Hall-effect travel, so depth is simulated from hold-duration relative to the key's actuation point.</p>
+          <div class="row">
+            <button id="keytest-toggle">ENABLE TEST MODE</button>
+            <span id="keytest-status" class="badge">DISABLED</span>
+          </div>
+          <div id="keytest-zone" class="panel mt" tabindex="0" style="min-height:70px;">
+            <span class="panel-title">capture zone (click to focus)</span><span class="cbl"></span><span class="cbr"></span>
+            <div id="keytest-readout" class="dim small">no key pressed yet</div>
+            <div class="travel-bar mt"><i id="keytest-travel"></i></div>
+          </div>
+        </div>
+
+        <div class="panel" id="panel-socd">
+          <span class="panel-title">socd / snap tap resolution</span><span class="cbl"></span><span class="cbr"></span>
+          <div class="row">
+            <label>SOCD Enabled</label>
+            <button id="socd-toggle" class="badge">OFF</button>
+          </div>
+          <div class="field">
+            <label for="socd-mode">Resolution Mode</label>
+            <select id="socd-mode">
+              <option value="last-input">Last Input Priority (snap-tap)</option>
+              <option value="first-input">First Input Priority</option>
+              <option value="neutral">Neutral (both cancel)</option>
+              <option value="neutral-permanent">Permanent Neutral (both released once opposed)</option>
+            </select>
+          </div>
+          <div id="socd-pairs"></div>
+          <p class="small dim mt">Live demo — focus the zone below and hold opposing keys to see which side wins under the current mode.</p>
+          <div id="socd-demo-zone" class="panel" tabindex="0">
+            <span class="panel-title">socd test zone</span><span class="cbl"></span><span class="cbr"></span>
+            <div id="socd-demo"></div>
+          </div>
+        </div>
+
+        <div class="panel" id="panel-rgb">
+          <span class="panel-title">rgb lighting</span><span class="cbl"></span><span class="cbr"></span>
+          <p class="small dim" id="rgb-note"></p>
+          <div class="panel-grid">
+            <div>
+              <div class="field">
+                <label for="rgb-effect">Effect</label>
+                <select id="rgb-effect"></select>
+              </div>
+              <div class="field">
+                <label>Color</label>
+                <div class="swatches" id="rgb-swatches"></div>
+              </div>
+              <div class="field">
+                <label for="rgb-brightness">Brightness: <span id="rgb-brightness-val" class="val"></span></label>
+                <input type="range" id="rgb-brightness" min="0" max="100" step="5" />
+              </div>
+              <div class="field">
+                <label for="rgb-speed">Effect Speed: <span id="rgb-speed-val" class="val"></span></label>
+                <input type="range" id="rgb-speed" min="0" max="100" step="5" />
+              </div>
+            </div>
+            <div>
+              <label class="small dim">Zone Toggle (click to include in effect)</label>
+              <div class="zone-grid mt" id="rgb-zones"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MACROS -->
+      <section class="screen" id="screen-macros">
+        <h1>&gt; MACRO ENGINE</h1>
+        <div class="panel">
+          <span class="panel-title">recorder</span><span class="cbl"></span><span class="cbr"></span>
+          <p class="small dim">Click RECORD, then focus the capture zone and perform your key sequence on the real keyboard. Timing between events is captured exactly as pressed.</p>
+          <div class="actions">
+            <button id="macro-record">● RECORD</button>
+            <button id="macro-stop" disabled>■ STOP &amp; SAVE</button>
+            <button id="macro-clear">CLEAR LOG</button>
+            <span id="macro-rec-status" class="badge">IDLE</span>
+          </div>
+          <div id="macro-capture-zone" class="panel mt" tabindex="0">
+            <span class="panel-title">capture zone</span><span class="cbl"></span><span class="cbr"></span>
+            click here, then perform your macro
+          </div>
+          <div class="log mt" id="macro-log"></div>
+        </div>
+
+        <div class="panel">
+          <span class="panel-title">saved macros</span><span class="cbl"></span><span class="cbr"></span>
+          <ul class="macro-list" id="macro-list"></ul>
+          <p class="dim small" id="macro-empty">No macros saved yet — record one above.</p>
+        </div>
+      </section>
+
+      <!-- PROFILES -->
+      <section class="screen" id="screen-profiles">
+        <h1>&gt; PROFILE STORAGE</h1>
+        <div class="panel">
+          <span class="panel-title">local persistence</span><span class="cbl"></span><span class="cbr"></span>
+          <p class="small dim">All settings are saved to this browser's localStorage automatically (like a vendor app's on-disk profile cache). Export to back up or move to another machine.</p>
+          <div class="actions">
+            <button id="btn-export">EXPORT PROFILE (.json)</button>
+            <button id="btn-import-trigger">IMPORT PROFILE</button>
+            <button id="btn-reset">FACTORY RESET</button>
+            <input type="file" id="btn-import-file" accept="application/json" class="hidden" />
+          </div>
+        </div>
+        <div class="panel">
+          <span class="panel-title">raw state</span><span class="cbl"></span><span class="cbr"></span>
+          <pre class="log" id="raw-state" style="height:260px;"></pre>
+        </div>
+        <div class="panel">
+          <span class="panel-title">display</span><span class="cbl"></span><span class="cbr"></span>
+          <div class="row">
+            <label>Theme</label>
+            <select id="theme-select">
+              <option value="white">Classic (White / Black)</option>
+              <option value="green">Phosphor Green</option>
+              <option value="amber">Amber</option>
+              <option value="cyan">Cyan</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>CRT Scanline FX</label>
+            <button id="crtfx-toggle" class="badge">ON</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ABOUT -->
+      <section class="screen" id="screen-about">
+        <h1>&gt; ABOUT</h1>
+        <div class="panel">
+          <span class="panel-title">devterm</span><span class="cbl"></span><span class="cbr"></span>
+          <p>DEVTERM is a text-first, terminal-styled configuration console for gaming mice and keyboards — modeled after vendor tools like Razer Synapse, Logitech G HUB and the MCHOSE driver suite, reimagined as a single all-text web app.</p>
+          <p>Everything runs client-side. Device state is simulated software profile data (no OS-level driver access exists from a browser), stored in <code>localStorage</code>, and exportable as JSON. A best-effort WebHID scan is available on the DEVICES screen for real, connected HID devices, limited to what the browser exposes.</p>
+          <p class="dim small">Type <code>help</code> in the command line below for shell-style navigation.</p>
+        </div>
+      </section>
+
+    </main>
+
+    <div id="cmd-log"></div>
+    <div id="cmdline">
+      <span class="prompt">guest@devterm:~$</span>
+      <input id="cmd-input" placeholder="type 'help'" autocomplete="off" spellcheck="false" />
+    </div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/storage.js"></script>
+<script src="assets/js/app.js"></script>
+</body>
+</html>
