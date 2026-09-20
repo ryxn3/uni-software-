@@ -31,7 +31,8 @@
       <button data-screen="keyboard">[3] KEYBOARD</button>
       <button data-screen="macros">[4] MACROS</button>
       <button data-screen="profiles">[5] PROFILES</button>
-      <button data-screen="about">[6] ABOUT</button>
+      <button data-screen="compat">[6] COMPATIBILITY</button>
+      <button data-screen="about">[7] ABOUT</button>
     </nav>
 
     <main id="screen-container">
@@ -280,6 +281,28 @@
         </div>
       </section>
 
+      <!-- COMPATIBILITY -->
+      <section class="screen" id="screen-compat">
+        <h1>&gt; COMPATIBLE DEVICE LIST</h1>
+        <p class="dim">Full driver-supported hardware catalog. Click a row to select it as the active device and jump to its config screen. Use <code>/</code> below to filter by brand or model.</p>
+
+        <div class="row">
+          <label for="compat-filter">Filter</label>
+          <input type="text" id="compat-filter" placeholder="brand or model, e.g. viper / mchose / wooting" style="flex:1;min-width:220px;" />
+          <span id="compat-count" class="dim small"></span>
+        </div>
+
+        <div class="panel">
+          <span class="panel-title">mice</span><span class="cbl"></span><span class="cbr"></span>
+          <div class="log compat-log" id="compat-mice" style="height:auto;max-height:420px;"></div>
+        </div>
+
+        <div class="panel">
+          <span class="panel-title">keyboards</span><span class="cbl"></span><span class="cbr"></span>
+          <div class="log compat-log" id="compat-kbds" style="height:auto;max-height:420px;"></div>
+        </div>
+      </section>
+
       <!-- ABOUT -->
       <section class="screen" id="screen-about">
         <h1>&gt; ABOUT</h1>
@@ -304,7 +327,7 @@
         <button id="help-toggle">HELP <span id="help-caret">^</span></button>
         <div id="help-panel" class="hidden">
           <div>help — list commands</div>
-          <div>devices / mouse / keyboard / macros / profiles / about — jump to screen</div>
+          <div>devices / mouse / keyboard / macros / profiles / compat / about — jump to screen</div>
           <div>use &lt;mouse|kbd&gt; &lt;device-id&gt; — set active device</div>
           <div>dpi / poll &lt;hz&gt; — quick settings on active screen</div>
           <div>theme &lt;white|green|amber|cyan&gt; — switch palette</div>

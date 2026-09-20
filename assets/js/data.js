@@ -3,153 +3,158 @@
    profiles the same way real vendor apps store them before syncing). */
 
 const POLLING_OPTIONS = [125, 500, 1000, 2000, 4000, 8000];
+const POLLING_STD = [125, 500, 1000];
+
+// Marketing-name RGB label per brand, used on the RGB panel & compat list.
+const BRAND_RGB = {
+  Razer: "Chroma RGB",
+  Logitech: "Lightsync RGB",
+  MCHOSE: "ARGB",
+  Wooting: "RGB",
+  SteelSeries: "Prism RGB",
+  Corsair: "iCUE RGB",
+  Glorious: "RGB",
+  Pulsar: "RGB",
+  Finalmouse: "RGB",
+  ASUS: "Aura Sync RGB",
+  Keychron: "RGB",
+  Ducky: "RGB",
+  "Royal Kludge": "RGB",
+};
+
+function mkMouse(id, brand, name, maxDpi, buttons, opts) {
+  opts = opts || {};
+  return {
+    id, brand, name, maxDpi, buttons,
+    polling: opts.polling || POLLING_OPTIONS,
+    wireless: !!opts.wireless,
+    socd: brand === "MCHOSE", // per driver policy, snap-tap is an MCHOSE-exclusive feature
+    rgbName: BRAND_RGB[brand] || "RGB",
+  };
+}
+
+function mkKeyboard(id, brand, name, opts) {
+  opts = opts || {};
+  return {
+    id, brand, name,
+    analog: !!opts.analog,
+    rapidTrigger: !!opts.analog,
+    socd: brand === "MCHOSE" && !!opts.analog, // SOCD/snap-tap: MCHOSE analog boards only
+    rgb: opts.rgb !== false,
+    rgbName: BRAND_RGB[brand] || "RGB",
+    polling: opts.polling || POLLING_OPTIONS,
+    actuationRange: opts.analog ? [0.1, 4.0] : undefined,
+    layout: opts.layout || "tkl",
+  };
+}
+
+const B6 = ["Left Click", "Right Click", "Scroll Click", "DPI Cycle", "Back", "Forward"];
+const B8 = ["Left Click", "Right Click", "Scroll Click", "DPI Cycle", "Back", "Forward", "DPI+", "DPI-"];
+const B5 = ["Left Click", "Right Click", "Scroll Click", "Back", "Forward"];
 
 const DEVICE_CATALOG = {
   mice: [
-    {
-      id: "razer-deathadder-v3-pro",
-      brand: "Razer",
-      name: "DeathAdder V3 Pro",
-      maxDpi: 30000,
-      buttons: ["Left Click", "Right Click", "Scroll Click", "DPI Cycle", "Back", "Forward"],
-      polling: POLLING_OPTIONS,
-      wireless: true,
-      socd: false,
-      rgbName: "Chroma RGB",
-    },
-    {
-      id: "razer-viper-v3-pro",
-      brand: "Razer",
-      name: "Viper V3 Pro",
-      maxDpi: 35000,
-      buttons: ["Left Click", "Right Click", "Scroll Click", "DPI Cycle", "Back", "Forward"],
-      polling: POLLING_OPTIONS,
-      wireless: true,
-      socd: false,
-      rgbName: "Chroma RGB",
-    },
-    {
-      id: "logitech-gpro-x-superlight-2",
-      brand: "Logitech",
-      name: "G Pro X Superlight 2",
-      maxDpi: 32000,
-      buttons: ["Left Click", "Right Click", "Scroll Click", "DPI", "Back", "Forward"],
-      polling: POLLING_OPTIONS,
-      wireless: true,
-      socd: false,
-      rgbName: "Lightsync RGB",
-    },
-    {
-      id: "logitech-g502x-plus",
-      brand: "Logitech",
-      name: "G502 X Plus",
-      maxDpi: 25600,
-      buttons: ["Left Click", "Right Click", "Scroll Click", "DPI+", "DPI-", "Back", "Forward", "Gesture"],
-      polling: POLLING_OPTIONS,
-      wireless: true,
-      socd: false,
-      rgbName: "Lightsync RGB",
-    },
-    {
-      id: "mchose-a5-pro",
-      brand: "MCHOSE",
-      name: "A5 Pro",
-      maxDpi: 26000,
-      buttons: ["Left Click", "Right Click", "Scroll Click", "DPI Cycle", "Back", "Forward"],
-      polling: POLLING_OPTIONS,
-      wireless: true,
-      socd: true,
-      rgbName: "ARGB",
-    },
-    {
-      id: "mchose-g5-pro",
-      brand: "MCHOSE",
-      name: "G5 Pro BT",
-      maxDpi: 19000,
-      buttons: ["Left Click", "Right Click", "Scroll Click", "DPI Cycle", "Back", "Forward"],
-      polling: POLLING_OPTIONS,
-      wireless: true,
-      socd: true,
-      rgbName: "ARGB",
-    },
+    // ---- Razer: full Viper lineup ----
+    mkMouse("razer-viper", "Razer", "Viper", 16000, B8, { wireless: false }),
+    mkMouse("razer-viper-mini", "Razer", "Viper Mini", 8500, B6, { wireless: false }),
+    mkMouse("razer-viper-mini-se", "Razer", "Viper Mini Signature Edition", 8500, B6, { wireless: true }),
+    mkMouse("razer-viper-8khz", "Razer", "Viper 8KHz", 20000, B8, { wireless: false }),
+    mkMouse("razer-viper-ultimate", "Razer", "Viper Ultimate", 20000, B8, { wireless: true }),
+    mkMouse("razer-viper-v2-pro", "Razer", "Viper V2 Pro", 30000, B5, { wireless: true }),
+    mkMouse("razer-viper-v3-pro", "Razer", "Viper V3 Pro", 35000, B5, { wireless: true }),
+    mkMouse("razer-viper-v3-hyperspeed", "Razer", "Viper V3 HyperSpeed", 30000, B8, { wireless: true }),
+    // ---- Razer: other lines ----
+    mkMouse("razer-deathadder-v2", "Razer", "DeathAdder V2", 20000, B8, { wireless: false }),
+    mkMouse("razer-deathadder-v3", "Razer", "DeathAdder V3", 30000, B6, { wireless: false }),
+    mkMouse("razer-deathadder-v3-pro", "Razer", "DeathAdder V3 Pro", 30000, B6, { wireless: true }),
+    mkMouse("razer-basilisk-v3-pro", "Razer", "Basilisk V3 Pro", 30000, B8, { wireless: true }),
+    mkMouse("razer-naga-v2-pro", "Razer", "Naga V2 Pro", 30000, B8.concat(["Side Panel 1-12"]), { wireless: true }),
+
+    // ---- Logitech ----
+    mkMouse("logitech-g-pro-wireless", "Logitech", "G Pro Wireless", 25600, B6, { wireless: true }),
+    mkMouse("logitech-gpro-x-superlight", "Logitech", "G Pro X Superlight", 25600, B5, { wireless: true }),
+    mkMouse("logitech-gpro-x-superlight-2", "Logitech", "G Pro X Superlight 2", 32000, B5, { wireless: true }),
+    mkMouse("logitech-g502-hero", "Logitech", "G502 Hero", 25600, B8.concat(["Gesture"]), { wireless: false }),
+    mkMouse("logitech-g502x-plus", "Logitech", "G502 X Plus", 25600, B8.concat(["Gesture"]), { wireless: true }),
+    mkMouse("logitech-g303-shroud", "Logitech", "G303 Shroud Edition", 25600, B6, { wireless: true }),
+    mkMouse("logitech-g203-lightsync", "Logitech", "G203 Lightsync", 8000, B6, { wireless: false, polling: POLLING_STD }),
+
+    // ---- MCHOSE ----
+    mkMouse("mchose-a5-pro", "MCHOSE", "A5 Pro", 26000, B6, { wireless: true }),
+    mkMouse("mchose-a5-air", "MCHOSE", "A5 Air", 26000, B6, { wireless: true }),
+    mkMouse("mchose-g5-pro", "MCHOSE", "G5 Pro BT", 19000, B6, { wireless: true }),
+    mkMouse("mchose-hs10", "MCHOSE", "HS10", 12800, B6, { wireless: false, polling: POLLING_STD }),
+
+    // ---- SteelSeries ----
+    mkMouse("steelseries-aerox-3-wireless", "SteelSeries", "Aerox 3 Wireless", 18000, B6, { wireless: true }),
+    mkMouse("steelseries-aerox-5", "SteelSeries", "Aerox 5", 18000, B8.concat(["Thumb Panel"]), { wireless: true }),
+    mkMouse("steelseries-rival-3", "SteelSeries", "Rival 3", 8500, B6, { wireless: false, polling: POLLING_STD }),
+
+    // ---- Corsair ----
+    mkMouse("corsair-sabre-rgb-pro", "Corsair", "Sabre RGB Pro", 26000, B6, { wireless: false }),
+    mkMouse("corsair-dark-core-rgb-pro", "Corsair", "Dark Core RGB Pro", 18000, B8, { wireless: true }),
+
+    // ---- Glorious ----
+    mkMouse("glorious-model-o-wireless", "Glorious", "Model O Wireless", 19000, B6, { wireless: true }),
+    mkMouse("glorious-model-d-2-pro", "Glorious", "Model D 2 Pro", 26000, B6, { wireless: true }),
+
+    // ---- Pulsar ----
+    mkMouse("pulsar-x2-v2", "Pulsar", "X2 V2", 26000, B6, { wireless: true }),
+
+    // ---- Finalmouse ----
+    mkMouse("finalmouse-starlight-12", "Finalmouse", "Starlight-12", 42000, B6, { wireless: true }),
+
+    // ---- ASUS ROG ----
+    mkMouse("asus-rog-harpe-ace", "ASUS", "ROG Harpe Ace Aim Lab Edition", 36000, B5, { wireless: true }),
+    mkMouse("asus-rog-gladius-iii", "ASUS", "ROG Gladius III", 19000, B8, { wireless: false }),
   ],
 
   keyboards: [
-    {
-      id: "mchose-ace60",
-      brand: "MCHOSE",
-      name: "ACE 60 HE (Magnetic)",
-      analog: true,
-      rapidTrigger: true,
-      socd: true,
-      rgb: true,
-      rgbName: "ARGB",
-      polling: POLLING_OPTIONS,
-      actuationRange: [0.1, 4.0],
-      layout: "ansi60",
-    },
-    {
-      id: "mchose-gx87",
-      brand: "MCHOSE",
-      name: "GX87 Magnetic",
-      analog: true,
-      rapidTrigger: true,
-      socd: true,
-      rgb: true,
-      rgbName: "ARGB",
-      polling: POLLING_OPTIONS,
-      actuationRange: [0.1, 4.0],
-      layout: "tkl",
-    },
-    {
-      id: "razer-huntsman-v3-pro",
-      brand: "Razer",
-      name: "Huntsman V3 Pro TKL",
-      analog: true,
-      rapidTrigger: true,
-      socd: false,
-      rgb: true,
-      rgbName: "Chroma RGB",
-      polling: POLLING_OPTIONS,
-      actuationRange: [0.1, 4.0],
-      layout: "tkl",
-    },
-    {
-      id: "razer-blackwidow-v4",
-      brand: "Razer",
-      name: "BlackWidow V4",
-      analog: false,
-      rapidTrigger: false,
-      socd: false,
-      rgb: true,
-      rgbName: "Chroma RGB",
-      polling: POLLING_OPTIONS,
-      layout: "full",
-    },
-    {
-      id: "logitech-g915x",
-      brand: "Logitech",
-      name: "G915 X TKL",
-      analog: false,
-      rapidTrigger: false,
-      socd: false,
-      rgb: true,
-      rgbName: "Lightsync RGB",
-      polling: POLLING_OPTIONS,
-      layout: "tkl",
-    },
-    {
-      id: "logitech-pro-x60",
-      brand: "Logitech",
-      name: "PRO X 60",
-      analog: false,
-      rapidTrigger: false,
-      socd: false,
-      rgb: true,
-      rgbName: "Lightsync RGB",
-      polling: POLLING_OPTIONS,
-      layout: "ansi60",
-    },
+    // ---- MCHOSE (magnetic/analog + SOCD) ----
+    mkKeyboard("mchose-ace60", "MCHOSE", "ACE 60 HE (Magnetic)", { analog: true, layout: "ansi60" }),
+    mkKeyboard("mchose-ace68", "MCHOSE", "ACE 68 HE", { analog: true, layout: "ansi60" }),
+    mkKeyboard("mchose-gx87", "MCHOSE", "GX87 Magnetic", { analog: true, layout: "tkl" }),
+    mkKeyboard("mchose-x87", "MCHOSE", "X87", { analog: false, layout: "tkl" }),
+
+    // ---- Razer ----
+    mkKeyboard("razer-huntsman-v3-pro-tkl", "Razer", "Huntsman V3 Pro TKL", { analog: true, layout: "tkl" }),
+    mkKeyboard("razer-huntsman-v3-pro", "Razer", "Huntsman V3 Pro", { analog: true, layout: "full" }),
+    mkKeyboard("razer-huntsman-mini", "Razer", "Huntsman Mini", { analog: false, layout: "ansi60" }),
+    mkKeyboard("razer-blackwidow-v4", "Razer", "BlackWidow V4", { analog: false, layout: "full" }),
+    mkKeyboard("razer-blackwidow-v4-75", "Razer", "BlackWidow V4 75%", { analog: false, layout: "tkl" }),
+    mkKeyboard("razer-deathstalker-v2-pro", "Razer", "DeathStalker V2 Pro", { analog: false, layout: "full" }),
+
+    // ---- Logitech ----
+    mkKeyboard("logitech-g915x", "Logitech", "G915 X TKL", { analog: false, layout: "tkl" }),
+    mkKeyboard("logitech-pro-x60", "Logitech", "PRO X 60", { analog: false, layout: "ansi60" }),
+    mkKeyboard("logitech-g915-tkl", "Logitech", "G915 TKL", { analog: false, layout: "tkl" }),
+    mkKeyboard("logitech-g-pro-x-tkl", "Logitech", "G Pro X TKL", { analog: false, layout: "tkl" }),
+    mkKeyboard("logitech-g913", "Logitech", "G913", { analog: false, layout: "full" }),
+
+    // ---- Wooting (analog / rapid trigger pioneers) ----
+    mkKeyboard("wooting-60he", "Wooting", "60HE", { analog: true, layout: "ansi60" }),
+    mkKeyboard("wooting-60he-plus", "Wooting", "60HE+", { analog: true, layout: "ansi60" }),
+    mkKeyboard("wooting-80he", "Wooting", "80HE", { analog: true, layout: "tkl" }),
+    mkKeyboard("wooting-two-he", "Wooting", "Two HE", { analog: true, layout: "full" }),
+
+    // ---- SteelSeries ----
+    mkKeyboard("steelseries-apex-pro", "SteelSeries", "Apex Pro", { analog: true, layout: "full" }),
+    mkKeyboard("steelseries-apex-pro-tkl", "SteelSeries", "Apex Pro TKL", { analog: true, layout: "tkl" }),
+    mkKeyboard("steelseries-apex-pro-mini", "SteelSeries", "Apex Pro Mini", { analog: true, layout: "ansi60" }),
+
+    // ---- Corsair ----
+    mkKeyboard("corsair-k70-max", "Corsair", "K70 Max", { analog: true, layout: "full" }),
+    mkKeyboard("corsair-k65-plus-wireless", "Corsair", "K65 Plus Wireless", { analog: true, layout: "tkl" }),
+
+    // ---- Keychron ----
+    mkKeyboard("keychron-q1-he", "Keychron", "Q1 HE", { analog: true, layout: "full" }),
+    mkKeyboard("keychron-k8-pro", "Keychron", "K8 Pro", { analog: false, layout: "tkl" }),
+
+    // ---- Ducky ----
+    mkKeyboard("ducky-one-3", "Ducky", "One 3", { analog: false, layout: "tkl" }),
+
+    // ---- Royal Kludge ----
+    mkKeyboard("royal-kludge-rk84", "Royal Kludge", "RK84", { analog: false, layout: "tkl" }),
   ],
 };
 

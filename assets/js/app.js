@@ -78,6 +78,8 @@
     renderKeyboardScreen();
     renderMacrosScreen();
     renderProfilesScreen();
+    renderCompatScreen();
+    $("#compat-filter").addEventListener("input", renderCompatScreen);
     initCommandLine();
     initHelpDropdown();
     updateStatusBar();
@@ -99,7 +101,8 @@
   }
 
   function updateStatusBar() {
-    $("#status-text").textContent = "2 DEVICES LINKED";
+    const total = DEVICE_CATALOG.mice.length + DEVICE_CATALOG.keyboards.length;
+    $("#status-text").textContent = `${total} DEVICES SUPPORTED`;
   }
 
   function toast(msg) {
@@ -134,6 +137,7 @@
     target.classList.add("active");
     btn.classList.add("active");
     if (name === "profiles") refreshRawState();
+    if (name === "compat") renderCompatScreen();
   }
 
   /* ---------------------------------------------------------------- */
@@ -828,6 +832,102 @@
   }
 
   /* ---------------------------------------------------------------- */
+  /* COMPATIBILITY SCREEN                                               */
+  /* ---------------------------------------------------------------- */
+
+  function pad(str, len) {
+    str = String(str);
+    return str.length >= len ? str.slice(0, len - 1) + " " : str + " ".repeat(len - str.length);
+  }
+
+  function renderCompatScreen() {
+    const filterEl = $("#compat-filter");
+    const q = (filterEl.value || "").trim().toLowerCase();
+
+    const mice = DEVICE_CATALOG.mice.filter(
+      (d) => !q || d.brand.toLowerCase().includes(q) || d.name.toLowerCase().includes(q)
+    );
+    const kbds = DEVICE_CATALOG.keyboards.filter(
+      (d) => !q || d.brand.toLowerCase().includes(q) || d.name.toLowerCase().includes(q)
+    );
+
+    const miceEl = $("#compat-mice");
+    miceEl.innerHTML = "";
+    const mHdr = document.createElement("div");
+    mHdr.className = "compat-hdr";
+    mHdr.textContent = `${pad("BRAND", 13)}${pad("MODEL", 32)}${pad("MAX DPI", 10)}${pad("BTNS", 6)}${pad("MAX Hz", 8)}TAGS`;
+    miceEl.appendChild(mHdr);
+    mice.forEach((d) => {
+      const row = document.createElement("div");
+      row.className = "compat-row" + (d.id === state.data.activeMouse ? " active" : "");
+      const tags = [d.wireless ? "WIRELESS" : "WIRED", d.socd ? "SOCD" : null].filter(Boolean).join(" · ");
+      row.textContent =
+        pad(d.brand.toUpperCase(), 13) +
+        pad(d.name, 32) +
+        pad(d.maxDpi.toLocaleString(), 10) +
+        pad(d.buttons.length, 6) +
+        pad(d.polling[d.polling.length - 1] + "Hz", 8) +
+        tags;
+      row.title = "Click to set as active mouse and open MOUSE screen";
+      row.addEventListener("click", () => {
+        state.data.activeMouse = d.id;
+        State.save();
+        renderDevicesScreen();
+        renderMouseScreen();
+        showScreen("mouse");
+        toast(`Active mouse set to ${d.brand} ${d.name}`);
+      });
+      miceEl.appendChild(row);
+    });
+    if (!mice.length) {
+      const none = document.createElement("div");
+      none.className = "dim";
+      none.textContent = "no matching mice";
+      miceEl.appendChild(none);
+    }
+
+    const kbdEl = $("#compat-kbds");
+    kbdEl.innerHTML = "";
+    const kHdr = document.createElement("div");
+    kHdr.className = "compat-hdr";
+    kHdr.textContent = `${pad("BRAND", 13)}${pad("MODEL", 32)}${pad("SWITCH", 10)}${pad("MAX Hz", 8)}TAGS`;
+    kbdEl.appendChild(kHdr);
+    kbds.forEach((d) => {
+      const row = document.createElement("div");
+      row.className = "compat-row" + (d.id === state.data.activeKeyboard ? " active" : "");
+      const tags = [
+        d.rapidTrigger ? "RAPID TRIGGER" : null,
+        d.socd ? "SOCD" : null,
+        d.rgb ? d.rgbName : null,
+      ].filter(Boolean).join(" · ");
+      row.textContent =
+        pad(d.brand.toUpperCase(), 13) +
+        pad(d.name, 32) +
+        pad(d.analog ? "ANALOG" : "MECH", 10) +
+        pad(d.polling[d.polling.length - 1] + "Hz", 8) +
+        tags;
+      row.title = "Click to set as active keyboard and open KEYBOARD screen";
+      row.addEventListener("click", () => {
+        state.data.activeKeyboard = d.id;
+        State.save();
+        renderDevicesScreen();
+        renderKeyboardScreen();
+        showScreen("keyboard");
+        toast(`Active keyboard set to ${d.brand} ${d.name}`);
+      });
+      kbdEl.appendChild(row);
+    });
+    if (!kbds.length) {
+      const none = document.createElement("div");
+      none.className = "dim";
+      none.textContent = "no matching keyboards";
+      kbdEl.appendChild(none);
+    }
+
+    $("#compat-count").textContent = `${mice.length} mice · ${kbds.length} keyboards`;
+  }
+
+  /* ---------------------------------------------------------------- */
   /* PROFILES SCREEN                                                    */
   /* ---------------------------------------------------------------- */
 
@@ -910,7 +1010,7 @@
         case "":
           break;
         case "help":
-          echo("commands: help, devices, mouse, keyboard, macros, profiles, about, scan, use <mouse|kbd> <id>, dpi <hz-index>, poll <hz>, theme <white|green|amber|cyan>, crtfx <on|off>, export, clear", "ok");
+          echo("commands: help, devices, mouse, keyboard, macros, profiles, compat, about, scan, use <mouse|kbd> <id>, dpi <hz-index>, poll <hz>, theme <white|green|amber|cyan>, crtfx <on|off>, export, clear", "ok");
           break;
         case "devices": case "ls":
           showScreen("devices"); echo("switched to DEVICES", "ok"); break;
@@ -922,6 +1022,8 @@
           showScreen("macros"); echo("switched to MACROS", "ok"); break;
         case "profiles":
           showScreen("profiles"); echo("switched to PROFILES", "ok"); break;
+        case "compat": case "list":
+          showScreen("compat"); echo("switched to COMPATIBILITY", "ok"); break;
         case "about":
           showScreen("about"); break;
         case "scan":

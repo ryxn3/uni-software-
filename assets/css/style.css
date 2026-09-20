@@ -290,6 +290,13 @@ p{ line-height:1.5; margin:.4em 0; }
 .log .l-up{ color:var(--fg-dim); }
 .log .l-sys{ color:var(--warn); }
 
+.compat-log{ white-space:pre; overflow-x:auto; font-size:.82em; line-height:1.65; }
+.compat-row{ cursor:pointer; }
+.compat-row:hover{ background:rgba(255,255,255,.08); }
+.compat-row.active{ color:var(--fg-bright); background:rgba(255,255,255,.14); }
+.compat-hdr{ color:var(--fg-dim); }
+.compat-tag{ color:var(--fg-dim); }
+
 .macro-list{ list-style:none; margin:0; padding:0; }
 .macro-list li{
   border:1px solid var(--fg-dim);
