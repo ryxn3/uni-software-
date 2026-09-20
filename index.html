@@ -98,8 +98,8 @@
           </table>
         </div>
 
-        <div class="panel">
-          <span class="panel-title">snap tap / socd (movement buttons)</span><span class="cbl"></span><span class="cbr"></span>
+        <div class="panel" id="panel-mouse-socd">
+          <span class="panel-title" id="mouse-socd-title">snap tap / socd (movement buttons)</span><span class="cbl"></span><span class="cbr"></span>
           <p class="small dim">Enable to apply opposite-direction input resolution when mouse side-buttons are bound to movement keystrokes. Full pair configuration lives on the KEYBOARD screen.</p>
           <div class="row">
             <label>Snap Tap Enabled</label>
@@ -162,12 +162,12 @@
           <div id="keytest-zone" class="panel mt" tabindex="0" style="min-height:70px;">
             <span class="panel-title">capture zone (click to focus)</span><span class="cbl"></span><span class="cbr"></span>
             <div id="keytest-readout" class="dim small">no key pressed yet</div>
-            <div class="travel-bar mt"><i id="keytest-travel"></i></div>
+            <div class="travel-bar mt" id="keytest-travel-wrap"><i id="keytest-travel"></i></div>
           </div>
         </div>
 
         <div class="panel" id="panel-socd">
-          <span class="panel-title">socd / snap tap resolution</span><span class="cbl"></span><span class="cbr"></span>
+          <span class="panel-title" id="socd-title">socd / snap tap resolution</span><span class="cbl"></span><span class="cbr"></span>
           <div class="row">
             <label>SOCD Enabled</label>
             <button id="socd-toggle" class="badge">OFF</button>
@@ -190,7 +190,7 @@
         </div>
 
         <div class="panel" id="panel-rgb">
-          <span class="panel-title">rgb lighting</span><span class="cbl"></span><span class="cbr"></span>
+          <span class="panel-title" id="rgb-title">rgb lighting</span><span class="cbl"></span><span class="cbr"></span>
           <p class="small dim" id="rgb-note"></p>
           <div class="panel-grid">
             <div>
@@ -297,6 +297,25 @@
     <div id="cmdline">
       <span class="prompt">guest@devterm:~$</span>
       <input id="cmd-input" placeholder="type 'help'" autocomplete="off" spellcheck="false" />
+    </div>
+
+    <div id="footerbar">
+      <div class="help-dropdown">
+        <button id="help-toggle">HELP <span id="help-caret">^</span></button>
+        <div id="help-panel" class="hidden">
+          <div>help — list commands</div>
+          <div>devices / mouse / keyboard / macros / profiles / about — jump to screen</div>
+          <div>use &lt;mouse|kbd&gt; &lt;device-id&gt; — set active device</div>
+          <div>dpi / poll &lt;hz&gt; — quick settings on active screen</div>
+          <div>theme &lt;white|green|amber|cyan&gt; — switch palette</div>
+          <div>export / clear</div>
+        </div>
+      </div>
+      <div class="footerbar-links">
+        <span>DEVTERM v1.0.0</span>
+        <span class="dim">·</span>
+        <span>LOCAL SESSION — NOTHING LEAVES THIS BROWSER</span>
+      </div>
     </div>
   </div>
 

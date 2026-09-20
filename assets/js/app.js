@@ -15,6 +15,14 @@
   /* BOOT SEQUENCE                                                     */
   /* ---------------------------------------------------------------- */
 
+  const BOOT_LOGO =
+"██████╗ ███████╗██╗   ██╗████████╗███████╗██████╗ ███╗   ███╗\n" +
+"██╔══██╗██╔════╝██║   ██║╚══██╔══╝██╔════╝██╔══██╗████╗ ████║\n" +
+"██║  ██║█████╗  ██║   ██║   ██║   █████╗  ██████╔╝██╔████╔██║\n" +
+"██║  ██║██╔══╝  ╚██╗ ██╔╝   ██║   ██╔══╝  ██╔══██╗██║╚██╔╝██║\n" +
+"██████╔╝███████╗ ╚████╔╝    ██║   ███████╗██║  ██║██║ ╚═╝ ██║\n" +
+"╚═════╝ ╚══════╝  ╚═══╝     ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝\n";
+
   const BOOT_LINES = [
     "DEVTERM BIOS v1.4.2 ................ OK",
     "Enumerating USB controllers ........ OK",
@@ -26,15 +34,17 @@
     "Mounting local profile store ....... OK",
     "Restoring last session profiles .... OK",
     "",
-    "DEVTERM READY.",
+    "DEVTERM READY. PERIPHERAL CONFIGURATION SHELL.",
+    "NAVIGATE WITH MOUSE, OR TYPE 'help' IN THE COMMAND LINE.",
   ];
 
   function boot() {
     const el = $("#boot-screen");
     let i = 0;
-    let buf = "";
+    let buf = BOOT_LOGO + "\n";
     el.textContent = "";
     const cursor = () => '<span id="boot-cursor">█</span>';
+    el.innerHTML = buf + cursor();
 
     function typeLine() {
       if (i >= BOOT_LINES.length) {
@@ -47,7 +57,7 @@
       i++;
       setTimeout(typeLine, BOOT_LINES[i - 1] === "" ? 60 : 90 + Math.random() * 70);
     }
-    typeLine();
+    setTimeout(typeLine, 200);
   }
 
   function finishBoot() {
@@ -69,6 +79,7 @@
     renderMacrosScreen();
     renderProfilesScreen();
     initCommandLine();
+    initHelpDropdown();
     updateStatusBar();
     initWebHID();
   }
@@ -281,7 +292,12 @@
       })
     );
 
-    setBadge($("#mouse-socd-toggle"), prof.socdEnabled);
+    const mouseSocdPanel = $("#panel-mouse-socd");
+    mouseSocdPanel.style.display = dev.socd ? "" : "none";
+    if (dev.socd) {
+      $("#mouse-socd-title").textContent = `snap tap / socd — ${dev.brand} exclusive`;
+      setBadge($("#mouse-socd-toggle"), prof.socdEnabled);
+    }
 
     $("#mouse-polling").onchange = (e) => {
       prof.polling = +e.target.value;
@@ -372,11 +388,16 @@
     $("#panel-keytest").style.display = "";
     $("#panel-socd").style.display = dev.socd ? "" : "none";
     $("#panel-rgb").style.display = dev.rgb ? "" : "none";
+    $("#keytest-travel-wrap").style.display = dev.analog ? "" : "none";
 
     $("#analog-note").textContent = dev.analog
       ? "Magnetic/Hall-effect switches — per-key actuation point and Rapid Trigger available."
       : "";
-    $("#rgb-note").textContent = dev.rgb ? `${dev.brand} ${dev.name} — per-zone lighting control.` : "";
+    if (dev.socd) $("#socd-title").textContent = `socd / snap tap resolution — ${dev.brand} exclusive`;
+    if (dev.rgb) {
+      $("#rgb-title").textContent = dev.rgbName || "rgb lighting";
+      $("#rgb-note").textContent = `${dev.brand} ${dev.name} — ${dev.rgbName || "RGB"} per-zone lighting control.`;
+    }
 
     if (dev.analog) {
       renderKeyLayout(dev, prof);
@@ -970,6 +991,22 @@
     });
 
     echo("DEVTERM shell ready. Type 'help' for commands.", "ok");
+  }
+
+  function initHelpDropdown() {
+    const btn = $("#help-toggle");
+    const panel = $("#help-panel");
+    const caret = $("#help-caret");
+    btn.addEventListener("click", () => {
+      const open = panel.classList.toggle("hidden") === false;
+      caret.textContent = open ? "v" : "^";
+    });
+    document.addEventListener("click", (e) => {
+      if (!panel.classList.contains("hidden") && !e.target.closest(".help-dropdown")) {
+        panel.classList.add("hidden");
+        caret.textContent = "^";
+      }
+    });
   }
 
   bindKeyboardStaticHandlers();
