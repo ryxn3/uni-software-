@@ -71,9 +71,10 @@
   /* ---------------------------------------------------------------- */
 
   function initApp() {
+    State.initRegistry();
     applyTheme();
     initNav();
-    renderDevicesScreen();
+    initScanScreen();
     renderMouseScreen();
     renderKeyboardScreen();
     renderMacrosScreen();
@@ -83,7 +84,7 @@
     initCommandLine();
     initHelpDropdown();
     updateStatusBar();
-    initWebHID();
+    runScan(false); // silent: only picks up devices already authorized in a past visit
   }
 
   function applyTheme() {
@@ -101,8 +102,9 @@
   }
 
   function updateStatusBar() {
-    const total = DEVICE_CATALOG.mice.length + DEVICE_CATALOG.keyboards.length;
-    $("#status-text").textContent = `${total} DEVICES SUPPORTED`;
+    const n = (state.data.activeMouse ? 1 : 0) + (state.data.activeKeyboard ? 1 : 0);
+    $("#status-dot").classList.toggle("on", n > 0);
+    $("#status-text").textContent = n ? `${n} DEVICE${n > 1 ? "S" : ""} ACTIVE` : "NO DEVICE ACTIVE";
   }
 
   function toast(msg) {
@@ -129,91 +131,186 @@
   }
 
   function showScreen(name) {
+    const target = $("#screen-" + name);
+    if (!target) return;
     $$(".screen").forEach((s) => s.classList.remove("active"));
     $$("#nav button").forEach((b) => b.classList.remove("active"));
-    const target = $("#screen-" + name);
-    const btn = $(`#nav button[data-screen="${name}"]`);
-    if (!target || !btn) return;
     target.classList.add("active");
-    btn.classList.add("active");
+    const btn = $(`#nav button[data-screen="${name}"]`);
+    if (btn) btn.classList.add("active");
     if (name === "profiles") refreshRawState();
     if (name === "compat") renderCompatScreen();
   }
 
   /* ---------------------------------------------------------------- */
-  /* DEVICES SCREEN                                                    */
+  /* DEVICES / SCAN SCREEN                                              */
   /* ---------------------------------------------------------------- */
 
-  function renderDevicesScreen() {
-    const miceWrap = $("#mice-cards");
-    miceWrap.innerHTML = "";
-    DEVICE_CATALOG.mice.forEach((d) => {
-      const card = document.createElement("div");
-      card.className = "device-card" + (d.id === state.data.activeMouse ? " selected" : "");
-      card.innerHTML = `
-        <div class="brand">${d.brand}</div>
-        <div class="name">${d.name}</div>
-        <div class="meta">MAX ${d.maxDpi.toLocaleString()} DPI · ${d.buttons.length} BTN · up to ${d.polling[d.polling.length - 1]}Hz</div>
-        <div class="meta">${d.id === state.data.activeMouse ? "[ACTIVE]" : "click to select"}</div>`;
-      card.addEventListener("click", () => {
-        state.data.activeMouse = d.id;
-        State.save();
-        renderDevicesScreen();
-        renderMouseScreen();
-        toast(`Active mouse set to ${d.brand} ${d.name}`);
-      });
-      miceWrap.appendChild(card);
-    });
+  function guessDeviceType(hidDevice) {
+    const cols = hidDevice.collections || [];
+    for (const c of cols) {
+      if (c.usagePage === 0x01 && c.usage === 0x02) return "mouse";
+      if (c.usagePage === 0x01 && c.usage === 0x06) return "keyboard";
+    }
+    const name = (hidDevice.productName || "").toLowerCase();
+    if (/mouse|viper|deathadder|basilisk|naga|aerox|rival|sabre|glorious|model [od]|harpe|gladius|starlight/.test(name)) return "mouse";
+    if (/keyboard|keychron|blackwidow|huntsman|apex|ace ?\d|gx87|k70|k65|k84|k8|rk84|deathstalker|one 3|q1/.test(name)) return "keyboard";
+    return "unknown";
+  }
 
-    const kbdWrap = $("#kbd-cards");
-    kbdWrap.innerHTML = "";
-    DEVICE_CATALOG.keyboards.forEach((d) => {
-      const card = document.createElement("div");
-      card.className = "device-card" + (d.id === state.data.activeKeyboard ? " selected" : "");
-      card.innerHTML = `
-        <div class="brand">${d.brand}</div>
-        <div class="name">${d.name}</div>
-        <div class="meta">${d.analog ? "MAGNETIC / ANALOG" : "MECHANICAL"} ${d.rapidTrigger ? "· RAPID TRIGGER" : ""}</div>
-        <div class="meta">${d.socd ? "SOCD CAPABLE · " : ""}up to ${d.polling[d.polling.length - 1]}Hz</div>
-        <div class="meta">${d.id === state.data.activeKeyboard ? "[ACTIVE]" : "click to select"}</div>`;
-      card.addEventListener("click", () => {
-        state.data.activeKeyboard = d.id;
-        State.save();
-        renderDevicesScreen();
-        renderKeyboardScreen();
-        toast(`Active keyboard set to ${d.brand} ${d.name}`);
-      });
-      kbdWrap.appendChild(card);
+  function hidToDevice(hidDevice, kind) {
+    const vendorId = hidDevice.vendorId;
+    const productId = hidDevice.productId;
+    const brand = VENDOR_MAP[vendorId] || null;
+    const catalogMatch = brand ? findCatalogMatch(kind, brand, hidDevice.productName) : null;
+    if (catalogMatch) return catalogMatch;
+    return kind === "mouse"
+      ? mkGenericMouse(vendorId, productId, hidDevice.productName)
+      : mkGenericKeyboard(vendorId, productId, hidDevice.productName);
+  }
+
+  function initScanScreen() {
+    const supported = "hid" in navigator;
+    $("#webhid-support").textContent = supported
+      ? "WebHID: available in this browser"
+      : "WebHID isn't supported here — try Chrome/Edge, or use the manual profile below";
+    $("#btn-scan").addEventListener("click", () => runScan(true));
+    $("#mouse-empty-scan").addEventListener("click", () => showScreen("devices"));
+    $("#kbd-empty-scan").addEventListener("click", () => showScreen("devices"));
+    populateManualSelects();
+    $("#manual-mouse-use").addEventListener("click", () => {
+      const id = $("#manual-mouse-select").value;
+      const dev = DEVICE_CATALOG.mice.find((d) => d.id === id);
+      if (!dev) return;
+      state.data.activeMouse = dev.id;
+      State.save();
+      renderMouseScreen();
+      updateStatusBar();
+      showScreen("mouse");
+      toast(`Loaded manual profile: ${dev.brand} ${dev.name}`);
+    });
+    $("#manual-kbd-use").addEventListener("click", () => {
+      const id = $("#manual-kbd-select").value;
+      const dev = DEVICE_CATALOG.keyboards.find((d) => d.id === id);
+      if (!dev) return;
+      state.data.activeKeyboard = dev.id;
+      State.save();
+      renderKeyboardScreen();
+      updateStatusBar();
+      showScreen("keyboard");
+      toast(`Loaded manual profile: ${dev.brand} ${dev.name}`);
     });
   }
 
-  function initWebHID() {
-    const supportEl = $("#webhid-support");
-    const supported = "hid" in navigator;
-    supportEl.textContent = supported ? "WebHID API: available" : "WebHID API: not supported in this browser";
-    $("#btn-webhid-scan").addEventListener("click", async () => {
-      const resultEl = $("#webhid-result");
-      resultEl.style.display = "block";
-      if (!supported) {
-        resultEl.textContent = "ERROR: navigator.hid is unavailable. Use a Chromium-based browser over HTTPS.";
-        return;
+  function populateManualSelects() {
+    const mSel = $("#manual-mouse-select");
+    mSel.innerHTML = '<option value="">— none —</option>' +
+      DEVICE_CATALOG.mice.map((d) => `<option value="${d.id}">${d.brand} ${d.name}</option>`).join("");
+    const kSel = $("#manual-kbd-select");
+    kSel.innerHTML = '<option value="">— none —</option>' +
+      DEVICE_CATALOG.keyboards.map((d) => `<option value="${d.id}">${d.brand} ${d.name}</option>`).join("");
+  }
+
+  async function runScan(userInitiated) {
+    const statusEl = $("#scan-status");
+    if (!("hid" in navigator)) {
+      statusEl.textContent = userInitiated
+        ? "WebHID not supported in this browser. Use the manual profile below instead."
+        : "idle — WebHID not supported in this browser";
+      return;
+    }
+
+    if (userInitiated) statusEl.textContent = "scanning... requesting device access";
+
+    let hidDevices;
+    try {
+      hidDevices = userInitiated ? await navigator.hid.requestDevice({ filters: [] }) : await navigator.hid.getDevices();
+    } catch (err) {
+      statusEl.textContent = "scan cancelled or blocked: " + err.message;
+      return;
+    }
+
+    if (!hidDevices.length) {
+      statusEl.textContent = userInitiated
+        ? "no device selected"
+        : "idle — no previously-authorized devices found. Click SCAN and grant access to a connected mouse or keyboard.";
+      renderScanResults([]);
+      return;
+    }
+
+    const entries = hidDevices.map((hidDevice) => {
+      const type = guessDeviceType(hidDevice);
+      const kind = type === "keyboard" ? "keyboard" : "mouse"; // unknown defaults to mouse-shaped profile until told otherwise
+      const dev = hidToDevice(hidDevice, kind);
+      return { hidDevice, type, dev };
+    });
+
+    entries.forEach((entry) => {
+      if (entry.type === "keyboard") {
+        State.addToRegistry("keyboard", entry.dev);
+        state.data.activeKeyboard = entry.dev.id;
+      } else {
+        State.addToRegistry("mouse", entry.dev);
+        if (entry.type === "mouse" || !state.data.activeMouse) state.data.activeMouse = entry.dev.id;
       }
-      try {
-        resultEl.textContent = "Requesting device permission...";
-        const devices = await navigator.hid.requestDevice({ filters: [] });
-        if (!devices.length) {
-          resultEl.textContent = "No device selected.";
-          return;
-        }
-        resultEl.textContent = devices
-          .map(
-            (d) =>
-              `DEVICE: ${d.productName || "Unknown"}\n  vendorId=0x${d.vendorId.toString(16).padStart(4, "0")} productId=0x${d.productId.toString(16).padStart(4, "0")}\n  collections=${d.collections.length}`
-          )
-          .join("\n\n");
-      } catch (err) {
-        resultEl.textContent = "Scan cancelled or blocked: " + err.message;
+    });
+    State.save();
+
+    statusEl.textContent = `found ${entries.length} authorized device${entries.length > 1 ? "s" : ""}`;
+    renderScanResults(entries);
+    renderMouseScreen();
+    renderKeyboardScreen();
+    updateStatusBar();
+  }
+
+  function renderScanResults(entries) {
+    const wrap = $("#scan-results");
+    wrap.innerHTML = "";
+    if (!entries.length) {
+      const none = document.createElement("p");
+      none.className = "dim small";
+      none.textContent = "nothing here yet — run a scan above.";
+      wrap.appendChild(none);
+      return;
+    }
+    entries.forEach((entry) => {
+      const { hidDevice, type, dev } = entry;
+      const row = document.createElement("div");
+      row.className = "panel";
+      const idHex = `0x${hidDevice.vendorId.toString(16).padStart(4, "0")}:0x${hidDevice.productId.toString(16).padStart(4, "0")}`;
+      row.innerHTML = `
+        <span class="panel-title">${type === "unknown" ? "unidentified device" : type}</span><span class="cbl"></span><span class="cbr"></span>
+        <div><b>${dev.brand} ${dev.name}</b></div>
+        <div class="dim small">${hidDevice.productName || "(no product name reported)"} · ${idHex}</div>
+        <div class="actions" data-actions></div>`;
+      const actions = row.querySelector("[data-actions]");
+      if (type !== "keyboard") {
+        const b = document.createElement("button");
+        b.textContent = "USE AS MOUSE";
+        b.addEventListener("click", () => {
+          state.data.activeMouse = dev.id;
+          State.save();
+          renderMouseScreen();
+          updateStatusBar();
+          showScreen("mouse");
+        });
+        actions.appendChild(b);
       }
+      if (type !== "mouse") {
+        const kDev = type === "unknown" ? hidToDevice(hidDevice, "keyboard") : dev;
+        if (type === "unknown") State.addToRegistry("keyboard", kDev);
+        const b = document.createElement("button");
+        b.textContent = "USE AS KEYBOARD";
+        b.addEventListener("click", () => {
+          state.data.activeKeyboard = kDev.id;
+          State.save();
+          renderKeyboardScreen();
+          updateStatusBar();
+          showScreen("keyboard");
+        });
+        actions.appendChild(b);
+      }
+      wrap.appendChild(row);
     });
   }
 
@@ -224,6 +321,12 @@
   function renderMouseScreen() {
     const dev = State.mouse();
     const prof = State.mouseProfile();
+    $("#mouse-empty").style.display = dev ? "none" : "";
+    $("#mouse-config-body").style.display = dev ? "" : "none";
+    if (!dev) {
+      $("#mouse-active-name").textContent = "";
+      return;
+    }
     $("#mouse-active-name").textContent = `— ${dev.brand} ${dev.name}`;
 
     // DPI stages
@@ -378,6 +481,12 @@
   function renderKeyboardScreen() {
     const dev = State.keyboard();
     const prof = State.keyboardProfile();
+    $("#kbd-empty").style.display = dev ? "none" : "";
+    $("#kbd-config-body").style.display = dev ? "" : "none";
+    if (!dev) {
+      $("#kbd-active-name").textContent = "";
+      return;
+    }
     $("#kbd-active-name").textContent = `— ${dev.brand} ${dev.name}`;
 
     const pollSel = $("#kbd-polling");
@@ -872,8 +981,8 @@
       row.addEventListener("click", () => {
         state.data.activeMouse = d.id;
         State.save();
-        renderDevicesScreen();
         renderMouseScreen();
+        updateStatusBar();
         showScreen("mouse");
         toast(`Active mouse set to ${d.brand} ${d.name}`);
       });
@@ -910,8 +1019,8 @@
       row.addEventListener("click", () => {
         state.data.activeKeyboard = d.id;
         State.save();
-        renderDevicesScreen();
         renderKeyboardScreen();
+        updateStatusBar();
         showScreen("keyboard");
         toast(`Active keyboard set to ${d.brand} ${d.name}`);
       });
@@ -1010,10 +1119,10 @@
         case "":
           break;
         case "help":
-          echo("commands: help, devices, mouse, keyboard, macros, profiles, compat, about, scan, use <mouse|kbd> <id>, dpi <hz-index>, poll <hz>, theme <white|green|amber|cyan>, crtfx <on|off>, export, clear", "ok");
+          echo("commands: help, scan, devices, mouse, keyboard, macros, profiles, compat, about, use <mouse|kbd> <id>, poll <hz>, theme <white|green|amber|cyan>, crtfx <on|off>, export, clear", "ok");
           break;
         case "devices": case "ls":
-          showScreen("devices"); echo("switched to DEVICES", "ok"); break;
+          showScreen("devices"); echo("switched to SCAN", "ok"); break;
         case "mouse":
           showScreen("mouse"); echo("switched to MOUSE", "ok"); break;
         case "keyboard": case "kbd":
@@ -1027,16 +1136,17 @@
         case "about":
           showScreen("about"); break;
         case "scan":
-          echo("scanning bus... found " + (DEVICE_CATALOG.mice.length + DEVICE_CATALOG.keyboards.length) + " known-driver devices", "ok");
           showScreen("devices");
+          runScan(true);
+          echo("scanning for connected devices...", "ok");
           break;
         case "use": {
           const [kind, id] = args;
           if (kind === "mouse" && DEVICE_CATALOG.mice.some((d) => d.id === id)) {
-            state.data.activeMouse = id; State.save(); renderDevicesScreen(); renderMouseScreen();
+            state.data.activeMouse = id; State.save(); renderMouseScreen(); updateStatusBar();
             echo("active mouse -> " + id, "ok");
           } else if ((kind === "kbd" || kind === "keyboard") && DEVICE_CATALOG.keyboards.some((d) => d.id === id)) {
-            state.data.activeKeyboard = id; State.save(); renderDevicesScreen(); renderKeyboardScreen();
+            state.data.activeKeyboard = id; State.save(); renderKeyboardScreen(); updateStatusBar();
             echo("active keyboard -> " + id, "ok");
           } else {
             echo("usage: use <mouse|kbd> <device-id>  (see 'devices')", "err");
@@ -1047,8 +1157,9 @@
           const hz = +args[0];
           const scr = $(".screen.active").id;
           if (!hz) { echo("usage: poll <hz>", "err"); break; }
-          if (scr === "screen-keyboard") { State.keyboardProfile().polling = hz; State.save(); renderKeyboardScreen(); }
-          else { State.mouseProfile().polling = hz; State.save(); renderMouseScreen(); }
+          if (scr === "screen-keyboard" && State.keyboardProfile()) { State.keyboardProfile().polling = hz; State.save(); renderKeyboardScreen(); }
+          else if (State.mouseProfile()) { State.mouseProfile().polling = hz; State.save(); renderMouseScreen(); }
+          else { echo("no active device on this screen — see 'scan'", "err"); break; }
           echo("polling rate -> " + hz + "Hz", "ok");
           break;
         }

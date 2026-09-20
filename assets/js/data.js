@@ -203,6 +203,56 @@ const LAYOUTS = {
   ],
 };
 
+/* Best-effort USB vendor ID -> brand name, used to label a real WebHID
+   scan result. Not exhaustive — many OEM controllers (including most
+   budget/whitelabel boards) don't map to a recognizable brand, in which
+   case the scan just labels the device "Generic". */
+const VENDOR_MAP = {
+  0x1532: "Razer",
+  0x046d: "Logitech",
+  0x1038: "SteelSeries",
+  0x1b1c: "Corsair",
+  0x0b05: "ASUS",
+  0x093a: "Glorious",
+  0x03eb: "Wooting",
+  0x3434: "Keychron",
+  0x04d9: "Ducky",
+  0x258a: "MCHOSE",
+};
+
+function mkGenericMouse(vendorId, productId, productName) {
+  return mkMouse(
+    `hid-mouse-${vendorId}-${productId}`,
+    VENDOR_MAP[vendorId] || "Generic",
+    productName || "HID Mouse",
+    16000,
+    B6,
+    { wireless: false }
+  );
+}
+
+function mkGenericKeyboard(vendorId, productId, productName) {
+  return mkKeyboard(
+    `hid-kbd-${vendorId}-${productId}`,
+    VENDOR_MAP[vendorId] || "Generic",
+    productName || "HID Keyboard",
+    { analog: false, layout: "tkl" }
+  );
+}
+
+// Try to line up a real scanned HID device with a known catalog entry
+// (same brand, and name substrings overlap), so a recognized Razer/
+// Logitech/MCHOSE device gets its full simulated feature set instead of
+// generic defaults. Returns null if nothing matches well.
+function findCatalogMatch(kind, brand, productName) {
+  const list = kind === "mouse" ? DEVICE_CATALOG.mice : DEVICE_CATALOG.keyboards;
+  const pool = list.filter((d) => d.brand === brand);
+  if (!pool.length) return null;
+  const name = (productName || "").toLowerCase();
+  const byName = pool.find((d) => name && (name.includes(d.name.toLowerCase()) || d.name.toLowerCase().includes(name)));
+  return byName || pool[0];
+}
+
 const SOCD_DEFAULT_PAIRS = [
   { id: "ad", label: "A / D  (Horizontal)", a: "KeyA", b: "KeyD" },
   { id: "ws", label: "W / S  (Vertical)", a: "KeyW", b: "KeyS" },

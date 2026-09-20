@@ -59,23 +59,18 @@ const State = {
     }
     if (!this.data) {
       this.data = {
-        activeMouse: DEVICE_CATALOG.mice[0].id,
-        activeKeyboard: DEVICE_CATALOG.keyboards[0].id,
+        activeMouse: null,
+        activeKeyboard: null,
         mouseProfiles: {},
         keyboardProfiles: {},
+        detected: [], // devices found by the last WebHID scan, for re-display
         macros: [],
         theme: "white",
         crtFx: false,
       };
     }
-    // backfill any missing device profiles
-    DEVICE_CATALOG.mice.forEach((d) => {
-      if (!this.data.mouseProfiles[d.id]) this.data.mouseProfiles[d.id] = defaultMouseProfile(d);
-    });
-    DEVICE_CATALOG.keyboards.forEach((d) => {
-      if (!this.data.keyboardProfiles[d.id]) this.data.keyboardProfiles[d.id] = defaultKeyboardProfile(d);
-    });
     if (!this.data.macros) this.data.macros = [];
+    if (!this.data.detected) this.data.detected = [];
     return this.data;
   },
 
@@ -87,17 +82,42 @@ const State = {
     }
   },
 
+  // Runtime registry of devices — the static catalog plus any generic
+  // devices synthesized from a real WebHID scan (see app.js scanDevices()).
+  registry: { mice: [], keyboards: [] },
+  initRegistry() {
+    this.registry.mice = DEVICE_CATALOG.mice.slice();
+    this.registry.keyboards = DEVICE_CATALOG.keyboards.slice();
+  },
+  addToRegistry(kind, dev) {
+    const list = kind === "mouse" ? this.registry.mice : this.registry.keyboards;
+    if (!list.some((d) => d.id === dev.id)) list.push(dev);
+  },
+
+  ensureMouseProfile(dev) {
+    if (!this.data.mouseProfiles[dev.id]) this.data.mouseProfiles[dev.id] = defaultMouseProfile(dev);
+    return this.data.mouseProfiles[dev.id];
+  },
+  ensureKeyboardProfile(dev) {
+    if (!this.data.keyboardProfiles[dev.id]) this.data.keyboardProfiles[dev.id] = defaultKeyboardProfile(dev);
+    return this.data.keyboardProfiles[dev.id];
+  },
+
   mouse() {
-    return DEVICE_CATALOG.mice.find((d) => d.id === this.data.activeMouse);
+    if (!this.data.activeMouse) return null;
+    return this.registry.mice.find((d) => d.id === this.data.activeMouse) || null;
   },
   mouseProfile() {
-    return this.data.mouseProfiles[this.data.activeMouse];
+    const dev = this.mouse();
+    return dev ? this.ensureMouseProfile(dev) : null;
   },
   keyboard() {
-    return DEVICE_CATALOG.keyboards.find((d) => d.id === this.data.activeKeyboard);
+    if (!this.data.activeKeyboard) return null;
+    return this.registry.keyboards.find((d) => d.id === this.data.activeKeyboard) || null;
   },
   keyboardProfile() {
-    return this.data.keyboardProfiles[this.data.activeKeyboard];
+    const dev = this.keyboard();
+    return dev ? this.ensureKeyboardProfile(dev) : null;
   },
 
   exportJSON() {
