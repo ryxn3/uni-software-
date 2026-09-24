@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Vokabo · Vocab Trainer</title>
+<meta name="description" content="Snap a photo of your vocabulary sheet and practise English ↔ German with typing, multiple choice, matching, letter building, flashcards and sprints — with detailed performance graphs." />
+<meta name="theme-color" content="#0e1020" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2224%22 fill=%22%237c5cff%22/><text x=%2250%22 y=%2270%22 font-size=%2260%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22Arial%22 font-weight=%22bold%22>V</text></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="css/style.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js" defer></script>
+<script type="module" src="js/app.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="#" data-go="home" aria-label="Home">
+    <span class="logo">V</span><span class="brand-name">Vokabo</span>
+  </a>
+  <nav class="topnav">
+    <button class="navbtn active" data-go="home">Decks</button>
+    <button class="navbtn" data-go="stats">Stats</button>
+    <button class="iconbtn" id="btn-settings" aria-label="Settings" title="Settings">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </nav>
+</header>
+
+<main id="app">
+
+  <!-- HOME -->
+  <section class="view" id="view-home">
+    <div class="hero">
+      <div>
+        <h1>Turn your vocab sheet into a game.</h1>
+        <p class="muted">Upload a photo of your English–German word list. Vokabo reads the words, then drills you with six different modes and tracks every answer.</p>
+      </div>
+      <div class="kpis" id="home-kpis"></div>
+    </div>
+
+    <div class="upload card" id="dropzone">
+      <div class="upload-icon">
+        <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      </div>
+      <h2>Upload your vocabulary sheet</h2>
+      <p class="muted">Drop images here, or pick them. Several pages at once work too.</p>
+      <div class="upload-actions">
+        <label class="btn primary">
+          <input type="file" id="file-input" accept="image/*" multiple hidden />
+          Choose images
+        </label>
+        <label class="btn">
+          <input type="file" id="camera-input" accept="image/*" capture="environment" hidden />
+          Take photo
+        </label>
+        <button class="btn ghost" id="btn-paste">Paste as text</button>
+        <button class="btn ghost" id="btn-manual">Type manually</button>
+      </div>
+      <p class="tiny muted" id="scan-method-note"></p>
+    </div>
+
+    <div class="section-head">
+      <h2>Your decks</h2>
+      <button class="btn small ghost" id="btn-sample">+ Add sample deck</button>
+    </div>
+    <div class="decks" id="deck-list"></div>
+  </section>
+
+  <!-- SCANNING -->
+  <section class="view" id="view-scan">
+    <div class="card scan-card">
+      <div class="scan-preview"><img id="scan-img" alt="Uploaded vocabulary sheet" /><div class="scanline"></div></div>
+      <div class="scan-info">
+        <h2 id="scan-title">Reading your sheet…</h2>
+        <p class="muted" id="scan-status">Starting up</p>
+        <div class="bar"><div class="bar-fill" id="scan-bar"></div></div>
+        <p class="tiny muted" id="scan-count"></p>
+        <button class="btn ghost small" id="btn-scan-cancel">Cancel</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- EDIT / REVIEW -->
+  <section class="view" id="view-edit">
+    <div class="section-head">
+      <div>
+        <h2 id="edit-title">Check your words</h2>
+        <p class="muted" id="edit-sub">Fix anything the scanner got wrong. Separate alternative answers with a comma.</p>
+      </div>
+    </div>
+    <div class="edit-layout">
+      <aside class="card edit-images" id="edit-images"></aside>
+      <div class="card edit-main">
+        <div class="edit-top">
+          <label class="field grow">
+            <span>Deck name</span>
+            <input type="text" id="deck-name" placeholder="e.g. Unit 4 – Travel" maxlength="60" />
+          </label>
+          <label class="field" id="save-target-wrap">
+            <span>Save to</span>
+            <select id="save-target"></select>
+          </label>
+        </div>
+        <div class="edit-tools">
+          <button class="btn small" id="btn-swap" title="Swap the two columns">⇄ Swap columns</button>
+          <button class="btn small" id="btn-add-row">+ Add word</button>
+          <button class="btn small ghost" id="btn-dedupe">Remove duplicates</button>
+          <button class="btn small ghost" id="btn-clear-empty">Remove empty rows</button>
+          <span class="grow"></span>
+          <span class="pill" id="word-count">0 words</span>
+        </div>
+        <div class="table-wrap">
+          <table class="word-table">
+            <thead><tr><th>#</th><th>🇬🇧 English</th><th>🇩🇪 German</th><th></th></tr></thead>
+            <tbody id="word-rows"></tbody>
+          </table>
+        </div>
+        <div class="edit-actions">
+          <button class="btn ghost" id="btn-edit-cancel">Cancel</button>
+          <button class="btn" id="btn-edit-save">Save deck</button>
+          <button class="btn primary" id="btn-edit-practice">Save &amp; practise →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODE SETUP -->
+  <section class="view" id="view-setup">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow" id="setup-deck-count"></p>
+        <h2 id="setup-deck-name">Deck</h2>
+      </div>
+      <button class="btn small ghost" data-go="home">← Back</button>
+    </div>
+    <h3 class="label">Choose a mode</h3>
+    <div class="modes" id="mode-grid"></div>
+
+    <div class="card options">
+      <div class="opt">
+        <span class="opt-label">Direction</span>
+        <div class="seg" id="opt-direction">
+          <button data-v="mix" class="on">🔀 Random</button>
+          <button data-v="en-de">🇬🇧 → 🇩🇪</button>
+          <button data-v="de-en">🇩🇪 → 🇬🇧</button>
+        </div>
+      </div>
+      <div class="opt" id="opt-length-wrap">
+        <span class="opt-label">Questions</span>
+        <div class="seg" id="opt-length">
+          <button data-v="10">10</button>
+          <button data-v="20" class="on">20</button>
+          <button data-v="all">All</button>
+        </div>
+      </div>
+      <div class="opt">
+        <span class="opt-label">Word order</span>
+        <div class="seg" id="opt-order">
+          <button data-v="random" class="on">Random</button>
+          <button data-v="weak">Weakest first</button>
+        </div>
+      </div>
+      <div class="opt toggles">
+        <label class="switch"><input type="checkbox" id="opt-speak" /><span></span> Read words aloud</label>
+        <label class="switch"><input type="checkbox" id="opt-strict" /><span></span> Strict spelling</label>
+        <label class="switch"><input type="checkbox" id="opt-articles" /><span></span> Require articles (der/die/das, to …)</label>
+      </div>
+    </div>
+    <div class="start-row">
+      <button class="btn primary big" id="btn-start">Start</button>
+    </div>
+  </section>
+
+  <!-- PLAY -->
+  <section class="view" id="view-play">
+    <div class="play-top">
+      <button class="iconbtn" id="btn-quit" aria-label="Quit" title="Quit">✕</button>
+      <div class="bar play-progress"><div class="bar-fill" id="play-bar"></div></div>
+      <div class="play-meta">
+        <span class="chip" id="play-streak" title="Streak">🔥 0</span>
+        <span class="chip" id="play-timer" title="Time">0:00</span>
+      </div>
+    </div>
+    <div class="play-stage" id="play-stage"></div>
+  </section>
+
+  <!-- RESULTS -->
+  <section class="view" id="view-results">
+    <div class="results-hero card">
+      <div class="donut-wrap">
+        <canvas id="chart-donut" aria-label="Correct vs wrong"></canvas>
+        <div class="donut-center"><strong id="res-acc">0%</strong><span>accuracy</span></div>
+      </div>
+      <div class="results-text">
+        <p class="eyebrow" id="res-mode"></p>
+        <h2 id="res-headline">Nice work!</h2>
+        <p class="muted" id="res-sub"></p>
+        <div class="res-actions">
+          <button class="btn primary" id="btn-again">↻ Play again</button>
+          <button class="btn" id="btn-mistakes">Practise mistakes</button>
+          <button class="btn ghost" data-go="home">Home</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tiles" id="res-tiles"></div>
+
+    <div class="card">
+      <h3 class="label">Try a different mode</h3>
+      <div class="modes compact" id="res-modes"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card chart-card">
+        <div class="chart-head"><h3>Time per answer</h3><div class="legend" id="legend-time"></div></div>
+        <div class="chart-box"><canvas id="chart-time"></canvas></div>
+      </div>
+      <div class="card chart-card">
+        <div class="chart-head"><h3>Accuracy on this deck over time</h3></div>
+        <div class="chart-box"><canvas id="chart-history"></canvas></div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card chart-card">
+        <div class="chart-head"><h3>Accuracy breakdown</h3></div>
+        <div class="chart-box short"><canvas id="chart-direction"></canvas></div>
+      </div>
+      <div class="card">
+        <h3 class="label">Answers</h3>
+        <div class="answer-list" id="res-answers"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <section class="view" id="view-stats">
+    <div class="section-head">
+      <div>
+        <h2>Your progress</h2>
+        <p class="muted">Every session you play is recorded here.</p>
+      </div>
+      <label class="field">
+        <span>Deck</span>
+        <select id="stats-deck"></select>
+      </label>
+    </div>
+    <div class="tiles" id="stats-tiles"></div>
+    <div id="stats-empty" class="card empty" hidden>
+      <p>No sessions yet. Play a round and your graphs will show up here.</p>
+    </div>
+    <div id="stats-body">
+      <div class="grid2">
+        <div class="card chart-card">
+          <div class="chart-head"><h3>Accuracy per session</h3></div>
+          <div class="chart-box"><canvas id="chart-acc"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <div class="chart-head"><h3>Minutes practised · last 14 days</h3></div>
+          <div class="chart-box"><canvas id="chart-days"></canvas></div>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="card chart-card">
+          <div class="chart-head"><h3>Average answer time per session</h3></div>
+          <div class="chart-box"><canvas id="chart-speed"></canvas></div>
+        </div>
+        <div class="card chart-card">
+          <div class="chart-head"><h3>Accuracy by mode</h3></div>
+          <div class="chart-box"><canvas id="chart-modes"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="chart-head"><h3>Words · weakest first</h3><span class="tiny muted">Mastery rises each time you get a word right</span></div>
+        <div class="table-wrap">
+          <table class="word-table stats-table">
+            <thead><tr><th>English</th><th>German</th><th>Seen</th><th>Right</th><th>Avg time</th><th>Mastery</th></tr></thead>
+            <tbody id="stats-words"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="label">Recent sessions</h3>
+        <div class="session-list" id="stats-sessions"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- MODALS -->
+<div class="modal" id="modal-paste" hidden>
+  <div class="modal-card">
+    <h2>Paste your word list</h2>
+    <p class="muted">One pair per line. Separate English and German with a dash, tab, “=”, “:” or “;”.</p>
+    <textarea id="paste-text" rows="10" placeholder="house - das Haus&#10;to run = laufen&#10;beautiful: schön"></textarea>
+    <div class="modal-actions">
+      <button class="btn ghost" data-close>Cancel</button>
+      <button class="btn primary" id="btn-paste-ok">Use these words</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal-settings" hidden>
+  <div class="modal-card">
+    <h2>Settings</h2>
+    <div class="settings">
+      <div class="set-group">
+        <h3 class="label">Sheet scanning</h3>
+        <p class="tiny muted">By default photos are read with free on-device text recognition. For messy or handwritten sheets, add an Anthropic API key to scan with Claude instead. The key is stored only in this browser.</p>
+        <label class="field">
+          <span>Anthropic API key (optional)</span>
+          <input type="password" id="set-key" placeholder="sk-ant-…" autocomplete="off" />
+        </label>
+        <div class="seg" id="set-scan">
+          <button data-v="auto" class="on">Auto</button>
+          <button data-v="ocr">On-device OCR</button>
+          <button data-v="ai">Claude AI</button>
+        </div>
+      </div>
+      <div class="set-group">
+        <h3 class="label">Experience</h3>
+        <label class="switch"><input type="checkbox" id="set-sound" /><span></span> Sound effects</label>
+        <label class="switch"><input type="checkbox" id="set-confetti" /><span></span> Confetti on great results</label>
+      </div>
+      <div class="set-group">
+        <h3 class="label">Theme</h3>
+        <div class="seg" id="set-theme">
+          <button data-v="auto" class="on">System</button>
+          <button data-v="light">Light</button>
+          <button data-v="dark">Dark</button>
+        </div>
+      </div>
+      <div class="set-group">
+        <h3 class="label">Data</h3>
+        <div class="row-wrap">
+          <button class="btn small" id="btn-export">Export backup</button>
+          <label class="btn small"><input type="file" id="import-file" accept="application/json" hidden />Import backup</label>
+          <button class="btn small danger" id="btn-reset">Delete everything</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn primary" data-close>Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="feedback" id="feedback">
+  <div class="feedback-inner">
+    <div class="fb-text">
+      <strong id="fb-title"></strong>
+      <div id="fb-body"></div>
+    </div>
+    <div class="fb-actions">
+      <button class="btn ghost small" id="btn-override" hidden>I was right</button>
+      <button class="btn big" id="btn-continue">Continue</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<canvas id="confetti" aria-hidden="true"></canvas>
+</body>
+</html>
