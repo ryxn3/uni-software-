@@ -97,7 +97,16 @@ function sound(kind) {
   } catch { /* audio unavailable */ }
 }
 
+// Native plugins, present only inside the Android app
+const native = window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins : null;
+
 function speak(text, lang) {
+  if (native?.TextToSpeech) {
+    native.TextToSpeech.stop().catch(() => {});
+    native.TextToSpeech.speak({ text: String(text).replace(/\(.*?\)/g, ''), lang: lang === 'de' ? 'de-DE' : 'en-GB', rate: 0.95 })
+      .catch(() => toast('Text-to-speech is not available on this device'));
+    return;
+  }
   if (!('speechSynthesis' in window)) return;
   const u = new SpeechSynthesisUtterance(String(text).replace(/\(.*?\)/g, ''));
   u.lang = lang === 'de' ? 'de-DE' : 'en-GB';
@@ -1296,12 +1305,23 @@ $('#set-theme').addEventListener('segchange', (e) => {
 });
 $('#set-sound').addEventListener('change', (e) => { db.settings.sound = e.target.checked; save(); });
 $('#set-confetti').addEventListener('change', (e) => { db.settings.confetti = e.target.checked; save(); });
-$('#btn-export').addEventListener('click', () => {
+$('#btn-export').addEventListener('click', async () => {
   const { apiKey, ...settings } = db.settings;
-  const blob = new Blob([JSON.stringify({ ...db, settings }, null, 2)], { type: 'application/json' });
+  const json = JSON.stringify({ ...db, settings }, null, 2);
+  const fileName = `vokabo-backup-${dayKey(Date.now())}.json`;
+  if (native?.Filesystem && native?.Share) {
+    try {
+      const { uri } = await native.Filesystem.writeFile({ path: fileName, data: json, directory: 'CACHE', encoding: 'utf8' });
+      await native.Share.share({ title: 'Vokabo backup', files: [uri] });
+    } catch (err) {
+      if (!/cancel/i.test(err?.message || '')) toast(`Export failed: ${err?.message || err}`);
+    }
+    return;
+  }
+  const blob = new Blob([json], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `vokabo-backup-${dayKey(Date.now())}.json`;
+  a.download = fileName;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 });
@@ -1389,6 +1409,17 @@ function confetti() {
     else ctx.clearRect(0, 0, innerWidth, innerHeight);
   })(t0);
 }
+
+// ---------- Android back button ----------
+native?.App?.addListener('backButton', () => {
+  const openModal = $$('.modal').find((m) => !m.hidden);
+  if (openModal) return closeModals();
+  if (ui.view === 'play') return $('#btn-quit').click();
+  if (ui.view === 'scan') return $('#btn-scan-cancel').click();
+  if (ui.view === 'edit') return show('home');
+  if (ui.view === 'setup' || ui.view === 'results' || ui.view === 'stats') return show('home');
+  native.App.exitApp();
+});
 
 // ---------- Boot ----------
 applyTheme();

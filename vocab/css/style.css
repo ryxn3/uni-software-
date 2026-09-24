@@ -1,5 +1,8 @@
 /* ---------- Tokens ---------- */
 :root {
+  /* Safe areas: env() on the web, --safe-area-inset-* injected by Capacitor on Android */
+  --sa-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+  --sa-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
   --bg: #f4f5fb;
   --bg-2: #eceefa;
   --surface: #ffffff;
@@ -108,7 +111,7 @@ input, select, textarea { font: inherit; color: var(--text); }
 .topbar {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; justify-content: space-between;
-  padding: .75rem max(16px, calc((100vw - 1120px) / 2));
+  padding: calc(.75rem + var(--sa-top)) max(16px, calc((100vw - 1120px) / 2)) .75rem;
   background: color-mix(in srgb, var(--bg) 80%, transparent);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
@@ -131,7 +134,7 @@ input, select, textarea { font: inherit; color: var(--text); }
 .iconbtn:hover { color: var(--text); border-color: var(--accent); }
 
 /* ---------- Layout ---------- */
-main { max-width: 1120px; margin: 0 auto; padding: 1.5rem 16px 5rem; }
+main { max-width: 1120px; margin: 0 auto; padding: 1.5rem 16px calc(5rem + var(--sa-bottom)); }
 .view { display: none; animation: fadeUp .35s ease both; }
 .view.active { display: block; }
 @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
@@ -371,7 +374,7 @@ main { max-width: 1120px; margin: 0 auto; padding: 1.5rem 16px 5rem; }
   display: none;
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; transform: translateY(110%);
   transition: transform .25s ease; border-top: 2px solid var(--border); background: var(--surface);
-  padding: 1.1rem 16px calc(1.1rem + env(safe-area-inset-bottom));
+  padding: 1.1rem 16px calc(1.1rem + var(--sa-bottom));
 }
 body[data-view="play"] .feedback { display: block; }
 .feedback.show { transform: none; }
@@ -442,7 +445,7 @@ body[data-view="play"] .feedback { display: block; }
 .set-group .field { width: 100%; }
 .set-group .label { margin: 0; }
 .toast {
-  position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, calc(100% + 40px)); opacity: 0; z-index: 60;
+  position: fixed; left: 50%; bottom: calc(24px + var(--sa-bottom)); transform: translate(-50%, calc(100% + 40px)); opacity: 0; z-index: 60;
   background: var(--text); color: var(--bg); padding: .7rem 1.1rem; border-radius: 12px; font-weight: 600;
   transition: transform .25s, opacity .25s; max-width: calc(100vw - 32px); box-shadow: var(--shadow-lg);
 }

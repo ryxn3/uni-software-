@@ -71,6 +71,8 @@ function getWorker() {
   if (!window.Tesseract) throw new Error('The text recognition library could not be loaded. Check your internet connection.');
   if (!workerPromise) {
     workerPromise = window.Tesseract.createWorker(['eng', 'deu'], 1, {
+      // The Android app bundles worker, core and language data (see android-app/scripts/build-web.mjs)
+      ...(window.VOKABO_LOCAL?.tesseract || {}),
       logger: (m) => progressHandler(m),
     }).catch((e) => { workerPromise = null; throw e; });
   }
