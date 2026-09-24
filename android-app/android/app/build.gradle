@@ -8,8 +8,8 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // CI sets VOKABO_BUILD_NUMBER so every APK is a newer version than the last
-        versionCode (System.getenv("VOKABO_BUILD_NUMBER") ?: "1").toInteger()
-        versionName "1.0." + (System.getenv("VOKABO_BUILD_NUMBER") ?: "0")
+        versionCode = Integer.parseInt(System.getenv("VOKABO_BUILD_NUMBER") ?: "1")
+        versionName = "1.0." + (System.getenv("VOKABO_BUILD_NUMBER") ?: "0")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
