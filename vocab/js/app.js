@@ -326,7 +326,10 @@ async function startScan(files) {
   const name = `Scanned ${new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`;
   openEditor({ deckId: null, name, rows: all.length ? all : [{ en: '', de: '' }], images: urls, fromScan: true });
   if (!all.length) toast('No word pairs found. Try a sharper, straight photo — or type them in below.', 5000);
-  else toast(`Found ${all.length} word pairs${swappedAny ? ' (columns auto-swapped so English is on the left)' : ''}. Check them quickly!`, 4000);
+  else {
+    const unsure = all.filter((p) => p.unsure).length;
+    toast(`Found ${all.length} word pairs${swappedAny ? ' (columns swapped so English is on the left)' : ''}.${unsure ? ` ${unsure} highlighted row${unsure > 1 ? 's' : ''} may be misread.` : ' Give them a quick check!'}`, 4500);
+  }
 }
 $('#btn-scan-cancel').addEventListener('click', () => { ui.scanCancel = true; show('home'); });
 
@@ -364,7 +367,7 @@ function openEditor(draft) {
 
 function renderRows() {
   const rows = ui.draft.rows;
-  $('#word-rows').innerHTML = rows.map((r, i) => `<tr data-i="${i}">
+  $('#word-rows').innerHTML = rows.map((r, i) => `<tr data-i="${i}" class="${r.unsure ? 'unsure' : ''}" title="${r.unsure ? 'The scanner wasn’t sure about this row — please check it' : ''}">
       <td>${i + 1}</td>
       <td><input data-k="en" value="${esc(r.en)}" placeholder="English" class="${r.en.trim() ? '' : 'missing'}" /></td>
       <td><input data-k="de" value="${esc(r.de)}" placeholder="Deutsch" class="${r.de.trim() ? '' : 'missing'}" /></td>
@@ -374,13 +377,15 @@ function renderRows() {
 }
 function updateCount() {
   const n = ui.draft.rows.filter((r) => r.en.trim() && r.de.trim()).length;
-  $('#word-count').textContent = `${n} word${n === 1 ? '' : 's'}`;
+  const unsure = ui.draft.rows.filter((r) => r.unsure).length;
+  $('#word-count').textContent = `${n} word${n === 1 ? '' : 's'}${unsure ? ` · ${unsure} to check` : ''}`;
 }
 $('#word-rows').addEventListener('input', (e) => {
   const inp = e.target.closest('input');
   if (!inp) return;
   const i = +inp.closest('tr').dataset.i;
   ui.draft.rows[i][inp.dataset.k] = inp.value;
+  if (ui.draft.rows[i].unsure) { delete ui.draft.rows[i].unsure; inp.closest('tr').classList.remove('unsure'); updateCount(); }
   inp.classList.toggle('missing', !inp.value.trim());
   updateCount();
 });
