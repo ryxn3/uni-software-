@@ -5,7 +5,7 @@ const HEADER_WORDS = /^(english|englisch|engl\.?|german|deutsch|dt\.?|vocabulary
 
 // ---------- Image helpers ----------
 
-async function loadBitmap(file) {
+export async function loadBitmap(file) {
   try {
     return await createImageBitmap(file, { imageOrientation: 'from-image' });
   } catch {

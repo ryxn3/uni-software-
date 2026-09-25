@@ -36,6 +36,10 @@ for (const lang of ['eng', 'deu']) {
   fs.writeFileSync(path.join(out, `vendor/lang/${lang}.traineddata`), zlib.gunzipSync(gz));
 }
 
+// QR codes for sharing decks
+copy(path.join(nm, 'qrcode-generator/qrcode.js'), path.join(out, 'vendor/qrcode.js'));
+copy(path.join(nm, 'jsqr/dist/jsQR.js'), path.join(out, 'vendor/jsQR.js'));
+
 // Font
 const fontDir = path.join(nm, '@fontsource/plus-jakarta-sans');
 let fontCss = '';
@@ -57,6 +61,8 @@ replaceOnce(/\s*<link rel="preconnect"[^>]*>/g, '');
 replaceOnce(/<link href="https:\/\/fonts\.googleapis\.com[^>]*>/, '<link rel="stylesheet" href="vendor/fonts/fonts.css" />');
 replaceOnce(/https:\/\/cdn\.jsdelivr\.net\/npm\/chart\.js@[^"]+/, 'vendor/chart.umd.js');
 replaceOnce(/https:\/\/cdn\.jsdelivr\.net\/npm\/tesseract\.js@[^"]+/, 'vendor/tesseract/tesseract.min.js');
+replaceOnce(/https:\/\/cdn\.jsdelivr\.net\/npm\/qrcode-generator@[^"]+/, 'vendor/qrcode.js');
+replaceOnce(/https:\/\/cdn\.jsdelivr\.net\/npm\/jsqr@[^"]+/, 'vendor/jsQR.js');
 replaceOnce(/<script type="module"/, `<script>
 window.VOKABO_LOCAL = {
   tesseract: {

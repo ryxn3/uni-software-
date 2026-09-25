@@ -1,5 +1,8 @@
-import { db, save, replaceAll, uid, newWord, getDeck } from './store.js';
+import { db, save, replaceAll, uid, newWord, getDeck, bump } from './store.js';
 import { ocrImage, aiScan, pairsFromText } from './scan.js';
+import { encodeDeck, decodeDeck, findCode, readDeckFile, deckFileContents, deckFileName, deckAsText, qrSvg, readQrFromImage } from './share.js';
+import { ACHIEVEMENTS, playerFacts, levelInfo, unlockNew } from './achievements.js';
+import { Cropper } from './crop.js';
 
 // ---------- Tiny helpers ----------
 const $ = (s, r = document) => r.querySelector(s);
@@ -204,13 +207,14 @@ function deckMastery(deck) {
 
 function renderHome() {
   const words = sum(db.decks.map((d) => d.words.length));
-  const time = sum(db.sessions.map((s) => s.durationMs || 0));
+  const lvl = levelInfo(playerFacts(db).xp);
+  const badges = Object.keys(db.achievements).length;
   $('#home-kpis').innerHTML = [
     ['🔥', dayStreak(), 'day streak'],
     ['📚', words, 'words saved'],
-    ['🎮', db.sessions.length, 'rounds played'],
-    ['⏱️', niceDuration(time), 'time practised'],
-  ].map(([i, v, l]) => `<div class="kpi"><strong>${i} ${esc(v)}</strong><span>${l}</span></div>`).join('');
+    ['⭐', `Level ${lvl.level}`, `${lvl.into} / ${lvl.span} XP to next`],
+    ['🏅', `${badges} / ${ACHIEVEMENTS.length}`, 'achievements'],
+  ].map(([i, v, l], k) => `<div class="kpi${k >= 2 ? ' kpi-link' : ''}"${k >= 2 ? ' data-go="stats" role="button" tabindex="0"' : ''}><strong>${i} ${esc(v)}</strong><span>${esc(l)}</span>${k === 2 ? `<div class="xpbar"><div style="width:${(lvl.into / lvl.span) * 100}%"></div></div>` : ''}</div>`).join('');
 
   const useAi = db.settings.scan === 'ai' || (db.settings.scan === 'auto' && db.settings.apiKey);
   $('#scan-method-note').textContent = useAi
@@ -237,6 +241,7 @@ function renderHome() {
       <div class="deck-actions">
         <button class="btn primary" data-act="play">Practise</button>
         <button class="btn" data-act="edit">Edit</button>
+        <button class="btn" data-act="share" title="Share with a friend" aria-label="Share deck">📤</button>
       </div>
     </article>`;
   }).join('');
@@ -249,6 +254,7 @@ $('#deck-list').addEventListener('click', (e) => {
   const deck = getDeck(id);
   if (!deck) return;
   if (btn.dataset.act === 'play') openSetup(id);
+  if (btn.dataset.act === 'share') openShare(deck);
   if (btn.dataset.act === 'edit') openEditor({ deckId: id, name: deck.name, rows: deck.words.map((w) => ({ id: w.id, en: w.en, de: w.de })), images: [] });
   if (btn.dataset.act === 'delete' && confirm(`Delete “${deck.name}”? Its session history is kept in your stats.`)) {
     db.decks = db.decks.filter((d) => d.id !== id);
@@ -272,15 +278,48 @@ const dz = $('#dropzone');
 ['dragleave', 'drop'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('drag'); }));
 dz.addEventListener('drop', (e) => {
   const files = [...(e.dataTransfer?.files || [])].filter((f) => f.type.startsWith('image/'));
-  if (files.length) startScan(files);
+  if (files.length) pickFiles(files);
   else toast('Please drop image files');
 });
-$('#file-input').addEventListener('change', (e) => { const f = [...e.target.files]; e.target.value = ''; if (f.length) startScan(f); });
-$('#camera-input').addEventListener('change', (e) => { const f = [...e.target.files]; e.target.value = ''; if (f.length) startScan(f); });
+$('#file-input').addEventListener('change', (e) => { const f = [...e.target.files]; e.target.value = ''; if (f.length) pickFiles(f); });
+$('#camera-input').addEventListener('change', (e) => { const f = [...e.target.files]; e.target.value = ''; if (f.length) pickFiles(f); });
 document.addEventListener('paste', (e) => {
   if (ui.view !== 'home' || !$('#modal-paste').hidden) return;
   const files = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith('image/'));
-  if (files.length) { e.preventDefault(); startScan(files); }
+  if (files.length) { e.preventDefault(); pickFiles(files); }
+});
+
+// ---------- Crop ----------
+let cropper = null;
+function pickFiles(files) {
+  if (!db.settings.crop) return startScan(files);
+  ui.crop = { files, i: 0, out: [] };
+  show('crop');
+  cropper = cropper || new Cropper($('#crop-stage'));
+  loadCropPage();
+}
+async function loadCropPage() {
+  const c = ui.crop;
+  $('#crop-step').textContent = c.files.length > 1 ? `Page ${c.i + 1} of ${c.files.length}` : 'Step 1 of 2';
+  $('#btn-crop-ok').textContent = c.i < c.files.length - 1 ? 'Next page →' : 'Scan →';
+  try {
+    await cropper.load(c.files[c.i]);
+  } catch (err) {
+    toast(`Could not open that image: ${err.message || err}`);
+    show('home');
+  }
+}
+$('#btn-rot-left').addEventListener('click', () => cropper?.rotate(-1));
+$('#btn-rot-right').addEventListener('click', () => cropper?.rotate(1));
+$('#btn-crop-reset').addEventListener('click', () => cropper?.reset());
+$('#btn-crop-cancel').addEventListener('click', () => { ui.crop = null; show('home'); });
+$('#btn-crop-ok').addEventListener('click', async () => {
+  const c = ui.crop;
+  if (!c || !cropper.view) return;
+  c.out.push(await cropper.result(c.files[c.i].name || 'photo.jpg'));
+  c.i++;
+  if (c.i < c.files.length) loadCropPage();
+  else { ui.crop = null; startScan(c.out); }
 });
 
 async function startScan(files) {
@@ -327,6 +366,8 @@ async function startScan(files) {
   openEditor({ deckId: null, name, rows: all.length ? all : [{ en: '', de: '' }], images: urls, fromScan: true });
   if (!all.length) toast('No word pairs found. Try a sharper, straight photo — or type them in below.', 5000);
   else {
+    bump('scans');
+    award();
     const unsure = all.filter((p) => p.unsure).length;
     toast(`Found ${all.length} word pairs${swappedAny ? ' (columns swapped so English is on the left)' : ''}.${unsure ? ` ${unsure} highlighted row${unsure > 1 ? 's' : ''} may be misread.` : ' Give them a quick check!'}`, 4500);
   }
@@ -475,8 +516,8 @@ function saveDraft() {
   save();
   return deck;
 }
-$('#btn-edit-save').addEventListener('click', () => { const deck = saveDraft(); if (deck) { toast('Deck saved'); show('home'); } });
-$('#btn-edit-practice').addEventListener('click', () => { const deck = saveDraft(); if (deck) openSetup(deck.id); });
+$('#btn-edit-save').addEventListener('click', () => { const deck = saveDraft(); if (deck) { toast('Deck saved'); show('home'); award(); } });
+$('#btn-edit-practice').addEventListener('click', () => { const deck = saveDraft(); if (deck) { openSetup(deck.id); award(); } });
 
 // ---------- Setup ----------
 function modeCards(current, compact, justPlayed) {
@@ -1006,7 +1047,7 @@ function finishGame() {
     id: uid(), deckId: g.deckId, deckName: g.deck.name, mode: g.mode, direction: g.opts.direction,
     startedAt: g.startedAt, endedAt, durationMs: endedAt - g.startedAt,
     total: items.length, correct: good, accuracy: items.length ? good / items.length : 0,
-    avgMs: Math.round(avg(times)), bestStreak: g.bestStreak,
+    avgMs: Math.round(avg(times)), bestStreak: g.bestStreak, mistakes: !!g.onlyIds,
     xp: items.reduce((x, i) => x + (i.result === 'good' ? (i.hinted ? 5 : 10) : i.result === 'warn' ? 6 : 0) + (i.result !== 'bad' && i.timeMs < 3000 ? 2 : 0), 0) + g.bestStreak * 2,
     items: items.map(({ snap, prevStreak, ...rest }) => rest),
   };
@@ -1021,6 +1062,9 @@ function finishGame() {
   show('results');
   renderResults(session);
   sound('done');
+  const fresh = session.total ? award() : [];
+  $('#res-badges').hidden = !fresh.length;
+  $('#res-badges').innerHTML = fresh.map((a) => `<div class="badge-chip"><span>${a.emoji}</span><div><small>Achievement unlocked</small><strong>${esc(a.name)}</strong></div></div>`).join('');
   if (session.total && session.accuracy >= 0.8 && db.settings.confetti) confetti();
 }
 
@@ -1229,6 +1273,7 @@ function renderStats() {
   ];
   $('#stats-tiles').innerHTML = tiles.map(([i, l, v]) => `<div class="tile-stat"><span class="ico">${i}</span> <span>${l}</span><strong>${esc(v)}</strong></div>`).join('');
 
+  renderAchievements();
   $('#stats-empty').hidden = !!sessions.length;
   $('#stats-body').hidden = !sessions.length;
   if (!sessions.length) return;
@@ -1295,6 +1340,7 @@ function openSettings() {
   setSeg('#set-scan', s.scan);
   setSeg('#set-theme', s.theme);
   $('#set-sound').checked = s.sound;
+  $('#set-crop').checked = s.crop;
   $('#set-confetti').checked = s.confetti;
   openModal('#modal-settings');
 }
@@ -1309,6 +1355,7 @@ $('#set-theme').addEventListener('segchange', (e) => {
   if (ui.view === 'results' && ui.last) renderResults(ui.last);
 });
 $('#set-sound').addEventListener('change', (e) => { db.settings.sound = e.target.checked; save(); });
+$('#set-crop').addEventListener('change', (e) => { db.settings.crop = e.target.checked; save(); });
 $('#set-confetti').addEventListener('change', (e) => { db.settings.confetti = e.target.checked; save(); });
 $('#btn-export').addEventListener('click', async () => {
   const { apiKey, ...settings } = db.settings;
@@ -1355,6 +1402,189 @@ $('#btn-reset').addEventListener('click', () => {
   closeModals();
   show('home');
   toast('All data deleted');
+});
+
+// ---------- Achievements ----------
+const unlockQueue = [];
+function award() {
+  const fresh = unlockNew(db);
+  if (!fresh.length) return fresh;
+  save();
+  unlockQueue.push(...fresh);
+  if (unlockQueue.length === fresh.length) showNextUnlock();
+  if (ui.view === 'home') renderHome();
+  return fresh;
+}
+function showNextUnlock() {
+  const a = unlockQueue[0];
+  if (!a) return;
+  const el = $('#unlock');
+  el.innerHTML = `<span class="unlock-emoji">${a.emoji}</span><div><small>Achievement unlocked!</small><strong>${esc(a.name)}</strong><span>${esc(a.desc)}</span></div>`;
+  el.classList.add('show');
+  sound('done');
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => { unlockQueue.shift(); showNextUnlock(); }, 350);
+  }, 2800);
+}
+$('#unlock').addEventListener('click', () => $('#unlock').classList.remove('show'));
+
+function renderAchievements() {
+  const facts = playerFacts(db);
+  const lvl = levelInfo(facts.xp);
+  $('#level-row').innerHTML = `<div class="level-badge">${lvl.level}</div>
+    <div class="grow"><strong>Level ${lvl.level}</strong> <span class="muted tiny">· ${facts.xp} XP total</span>
+      <div class="xpbar big"><div style="width:${(lvl.into / lvl.span) * 100}%"></div></div>
+      <span class="tiny muted">${lvl.span - lvl.into} XP to level ${lvl.level + 1} · you earn XP for right answers, fast answers and streaks</span></div>`;
+  const got = ACHIEVEMENTS.filter((a) => db.achievements[a.id]).length;
+  $('#ach-count').textContent = `${got} of ${ACHIEVEMENTS.length} unlocked`;
+  $('#ach-grid').innerHTML = [...ACHIEVEMENTS]
+    .sort((a, b) => (db.achievements[b.id] ? 1 : 0) - (db.achievements[a.id] ? 1 : 0))
+    .map((a) => {
+      const when = db.achievements[a.id];
+      const [cur, target] = a.progress(facts);
+      const showBar = !when && target > 1;
+      return `<div class="ach ${when ? 'got' : ''}" title="${esc(a.desc)}">
+        <span class="ach-emoji">${a.emoji}</span>
+        <div><strong>${esc(a.name)}</strong><span>${esc(a.desc)}</span>
+        ${when ? `<small>✓ ${new Date(when).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</small>` : ''}
+        ${showBar ? `<div class="ach-bar"><div style="width:${Math.min(100, (cur / target) * 100)}%"></div></div><small>${Math.min(cur, target)} / ${target}</small>` : ''}</div>
+      </div>`;
+    }).join('');
+}
+
+// ---------- Share & import decks ----------
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return ok;
+  }
+}
+
+async function openShare(deck) {
+  ui.sharing = deck;
+  ui.shareCode = null;
+  $('#share-name').textContent = deck.name;
+  $('#share-qr').innerHTML = '<p class="muted">Making QR code…</p>';
+  openModal('#modal-share');
+  try {
+    ui.shareCode = await encodeDeck(deck);
+    const svg = qrSvg(ui.shareCode);
+    $('#share-qr').innerHTML = svg || `<p class="muted">This deck is too big for one QR code (${deck.words.length} words). Send it as a file or message instead.</p>`;
+  } catch (err) {
+    $('#share-qr').innerHTML = `<p class="muted">Could not make a share code: ${esc(err.message || err)}</p>`;
+  }
+}
+function shared() {
+  bump('shares');
+  award();
+}
+const cancelled = (err) => /cancel|abort/i.test(`${err?.message || ''} ${err?.name || ''}`);
+$('#btn-share-file').addEventListener('click', async () => {
+  const deck = ui.sharing;
+  if (!deck) return;
+  const name = deckFileName(deck);
+  const data = deckFileContents(deck);
+  try {
+    if (native?.Filesystem && native?.Share) {
+      const { uri } = await native.Filesystem.writeFile({ path: name, data, directory: 'CACHE', encoding: 'utf8' });
+      await native.Share.share({ title: `Vokabo deck: ${deck.name}`, text: `Vokabo deck “${deck.name}” (${deck.words.length} words). In Vokabo tap 📥 Import deck → Open deck file.`, files: [uri] });
+    } else {
+      const file = new File([data], name, { type: 'application/json' });
+      if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], title: deck.name });
+      else {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(file);
+        a.download = name;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      }
+    }
+    shared();
+  } catch (err) {
+    if (!cancelled(err)) toast(`Sharing failed: ${err?.message || err}`);
+  }
+});
+$('#btn-share-msg').addEventListener('click', async () => {
+  const deck = ui.sharing;
+  if (!deck || !ui.shareCode) return;
+  const text = `📚 Vokabo deck “${deck.name}” (${deck.words.length} words)\nCopy this whole message, then in Vokabo tap 📥 Import deck and paste it:\n\n${ui.shareCode}`;
+  try {
+    if (native?.Share) await native.Share.share({ title: deck.name, text });
+    else if (navigator.share) await navigator.share({ title: deck.name, text });
+    else if (await copyText(text)) toast('Message copied — paste it into any chat');
+    else throw new Error('Could not copy');
+    shared();
+  } catch (err) {
+    if (!cancelled(err)) toast(`Sharing failed: ${err?.message || err}`);
+  }
+});
+$('#btn-share-copy').addEventListener('click', async () => {
+  if (!ui.shareCode) return;
+  if (await copyText(ui.shareCode)) { toast('Share code copied'); shared(); } else toast('Could not copy');
+});
+$('#btn-share-text').addEventListener('click', async () => {
+  if (!ui.sharing) return;
+  if (await copyText(deckAsText(ui.sharing))) toast('Word list copied'); else toast('Could not copy');
+});
+
+function addSharedDeck(incoming) {
+  const names = new Set(db.decks.map((d) => d.name));
+  let name = incoming.name;
+  if (names.has(name)) { let n = 2; while (names.has(`${incoming.name} (${n})`)) n++; name = `${incoming.name} (${n})`; }
+  const deck = { id: uid(), name, created: Date.now(), lastPlayed: 0, words: incoming.words.map((w) => newWord(w.en, w.de)) };
+  db.decks.push(deck);
+  bump('imports');
+  closeModals();
+  show('home');
+  toast(`“${name}” imported — ${deck.words.length} words`);
+  award();
+}
+$('#btn-import-deck').addEventListener('click', () => { $('#import-text').value = ''; openModal('#modal-import'); });
+$('#import-qr').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  try {
+    const text = await readQrFromImage(f);
+    if (!findCode(text)) throw new Error('That QR code is not a Vokabo deck');
+    addSharedDeck(await decodeDeck(text));
+  } catch (err) {
+    toast(err.message || String(err), 4000);
+  }
+});
+$('#import-deck-file').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  try {
+    addSharedDeck(await readDeckFile(f));
+  } catch (err) {
+    toast(err.message || String(err), 4000);
+  }
+});
+$('#btn-import-ok').addEventListener('click', async () => {
+  const text = $('#import-text').value;
+  if (!text.trim()) { toast('Paste a share code or word list first'); return; }
+  try {
+    if (findCode(text)) { addSharedDeck(await decodeDeck(text)); return; }
+    const { pairs } = pairsFromText(text);
+    if (!pairs.length) throw new Error('No share code or word pairs found in that text');
+    closeModals();
+    openEditor({ deckId: null, name: 'Imported words', rows: pairs, images: [], fromScan: true });
+  } catch (err) {
+    toast(err.message || String(err), 4000);
+  }
 });
 
 // ---------- Global keys & nav ----------
@@ -1421,6 +1651,7 @@ native?.App?.addListener('backButton', () => {
   if (openModal) return closeModals();
   if (ui.view === 'play') return $('#btn-quit').click();
   if (ui.view === 'scan') return $('#btn-scan-cancel').click();
+  if (ui.view === 'crop') return $('#btn-crop-cancel').click();
   if (ui.view === 'edit') return show('home');
   if (ui.view === 'setup' || ui.view === 'results' || ui.view === 'stats') return show('home');
   native.App.exitApp();
@@ -1435,3 +1666,5 @@ window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change',
 });
 if ('speechSynthesis' in window) speechSynthesis.getVoices();
 show('home');
+// Badges earned before this version (or on another device's backup) unlock now
+setTimeout(award, 800);

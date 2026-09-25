@@ -13,6 +13,8 @@
 <link rel="stylesheet" href="css/style.css" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js" defer></script>
 <script type="module" src="js/app.js"></script>
 </head>
 <body>
@@ -64,9 +66,40 @@
 
     <div class="section-head">
       <h2>Your decks</h2>
-      <button class="btn small ghost" id="btn-sample">+ Add sample deck</button>
+      <div class="row-wrap">
+        <button class="btn small" id="btn-import-deck">📥 Import deck</button>
+        <button class="btn small ghost" id="btn-sample">+ Sample deck</button>
+      </div>
     </div>
     <div class="decks" id="deck-list"></div>
+  </section>
+
+  <!-- CROP -->
+  <section class="view" id="view-crop">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow" id="crop-step"></p>
+        <h2>Frame the word list</h2>
+        <p class="muted">Drag the corners so only the table with the words is inside the box.</p>
+      </div>
+    </div>
+    <div class="card crop-card">
+      <div class="crop-stage" id="crop-stage">
+        <canvas></canvas>
+        <div class="crop-box">
+          <span data-h="tl"></span><span data-h="tr"></span><span data-h="bl"></span><span data-h="br"></span>
+          <span data-h="t" class="edge"></span><span data-h="b" class="edge"></span><span data-h="l" class="edge"></span><span data-h="r" class="edge"></span>
+        </div>
+      </div>
+      <div class="crop-tools">
+        <button class="btn small" id="btn-rot-left" title="Rotate left">↺ Rotate</button>
+        <button class="btn small" id="btn-rot-right" title="Rotate right">↻</button>
+        <button class="btn small ghost" id="btn-crop-reset">Whole photo</button>
+        <span class="grow"></span>
+        <button class="btn ghost" id="btn-crop-cancel">Cancel</button>
+        <button class="btn primary" id="btn-crop-ok">Scan →</button>
+      </div>
+    </div>
   </section>
 
   <!-- SCANNING -->
@@ -206,6 +239,7 @@
       </div>
     </div>
 
+    <div class="badge-strip" id="res-badges" hidden></div>
     <div class="tiles" id="res-tiles"></div>
 
     <div class="card">
@@ -249,6 +283,11 @@
       </label>
     </div>
     <div class="tiles" id="stats-tiles"></div>
+    <div class="card" id="achievements-card">
+      <div class="level-row" id="level-row"></div>
+      <div class="chart-head"><h3>Achievements</h3><span class="tiny muted" id="ach-count"></span></div>
+      <div class="ach-grid" id="ach-grid"></div>
+    </div>
     <div id="stats-empty" class="card empty" hidden>
       <p>No sessions yet. Play a round and your graphs will show up here.</p>
     </div>
@@ -303,6 +342,40 @@
   </div>
 </div>
 
+<div class="modal" id="modal-share" hidden>
+  <div class="modal-card">
+    <h2>Share “<span id="share-name"></span>”</h2>
+    <p class="muted">A friend can scan this QR code in Vokabo (📥 Import deck → Scan QR code), or you can send the deck another way.</p>
+    <div class="qr-box" id="share-qr"></div>
+    <div class="share-actions">
+      <button class="btn primary" id="btn-share-file">📤 Send deck file</button>
+      <button class="btn" id="btn-share-msg">💬 Send as message</button>
+      <button class="btn" id="btn-share-copy">📋 Copy code</button>
+      <button class="btn ghost small" id="btn-share-text">Copy as word list</button>
+    </div>
+    <div class="modal-actions"><button class="btn" data-close>Done</button></div>
+  </div>
+</div>
+
+<div class="modal" id="modal-import" hidden>
+  <div class="modal-card">
+    <h2>Import a deck</h2>
+    <p class="muted">Got a deck from a friend? Use their QR code, the deck file they sent, or paste their share code.</p>
+    <div class="share-actions">
+      <label class="btn primary"><input type="file" id="import-qr" accept="image/*" hidden />📷 Scan QR code</label>
+      <label class="btn"><input type="file" id="import-deck-file" hidden />📂 Open deck file</label>
+    </div>
+    <p class="tiny muted" style="margin-top:1rem">Or paste a share code (VOKABO1:…) or a word list:</p>
+    <textarea id="import-text" rows="4" placeholder="VOKABO1:…"></textarea>
+    <div class="modal-actions">
+      <button class="btn ghost" data-close>Cancel</button>
+      <button class="btn primary" id="btn-import-ok">Import</button>
+    </div>
+  </div>
+</div>
+
+<div class="unlock" id="unlock" role="status" aria-live="polite"></div>
+
 <div class="modal" id="modal-settings" hidden>
   <div class="modal-card">
     <h2>Settings</h2>
@@ -314,6 +387,7 @@
           <span>Anthropic API key (optional)</span>
           <input type="password" id="set-key" placeholder="sk-ant-…" autocomplete="off" />
         </label>
+        <label class="switch"><input type="checkbox" id="set-crop" /><span></span> Crop photos before scanning</label>
         <div class="seg" id="set-scan">
           <button data-v="auto" class="on">Auto</button>
           <button data-v="ocr">On-device OCR</button>

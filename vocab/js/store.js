@@ -15,10 +15,11 @@ const DEFAULT_SETTINGS = {
   speak: false,
   strict: false,
   articles: false,
+  crop: true,
 };
 
 function blank() {
-  return { decks: [], sessions: [], settings: { ...DEFAULT_SETTINGS } };
+  return { decks: [], sessions: [], settings: { ...DEFAULT_SETTINGS }, achievements: {}, counters: {} };
 }
 
 function load() {
@@ -30,6 +31,8 @@ function load() {
       decks: Array.isArray(d.decks) ? d.decks : [],
       sessions: Array.isArray(d.sessions) ? d.sessions : [],
       settings: { ...DEFAULT_SETTINGS, ...(d.settings || {}) },
+      achievements: d.achievements && typeof d.achievements === 'object' ? d.achievements : {},
+      counters: d.counters && typeof d.counters === 'object' ? d.counters : {},
     };
   } catch {
     return blank();
@@ -51,6 +54,8 @@ export function replaceAll(data) {
   db.decks = Array.isArray(data.decks) ? data.decks : fresh.decks;
   db.sessions = Array.isArray(data.sessions) ? data.sessions : fresh.sessions;
   db.settings = { ...DEFAULT_SETTINGS, ...(data.settings || {}) };
+  db.achievements = data.achievements && typeof data.achievements === 'object' ? data.achievements : {};
+  db.counters = data.counters && typeof data.counters === 'object' ? data.counters : {};
   save();
 }
 
@@ -60,6 +65,11 @@ export function uid() {
 
 export function newWord(en, de) {
   return { id: uid(), en, de, stats: { seen: 0, correct: 0, wrong: 0, box: 0, time: 0, last: 0 } };
+}
+
+export function bump(counter, by = 1) {
+  db.counters[counter] = (db.counters[counter] || 0) + by;
+  save();
 }
 
 export function getDeck(id) {

@@ -22,6 +22,8 @@
     "@tesseract.js-data/deu": "1.0.0",
     "@tesseract.js-data/eng": "1.0.0",
     "chart.js": "4.4.4",
+    "jsqr": "1.4.0",
+    "qrcode-generator": "1.4.4",
     "tesseract.js": "5.1.1",
     "tesseract.js-core": "5.1.1"
   }
