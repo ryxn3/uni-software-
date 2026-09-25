@@ -53,21 +53,26 @@ jobs:
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Collect APK
-        run: cp android-app/android/app/build/outputs/apk/debug/app-debug.apk Vokabo.apk
+        run: |
+          cp android-app/android/app/build/outputs/apk/debug/app-debug.apk Vokabo.apk
+          # Some browsers stall on .apk downloads; a zip downloads like any file
+          zip -j Vokabo.zip Vokabo.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: Vokabo-apk
-          path: Vokabo.apk
+          path: |
+            Vokabo.apk
+            Vokabo.zip
 
       - name: Publish as "android-latest" release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete android-latest --yes --cleanup-tag || true
-          gh release create android-latest Vokabo.apk \
+          gh release create android-latest Vokabo.apk Vokabo.zip \
             --target "$GITHUB_SHA" \
             --prerelease \
             --title "Vokabo for Android (build ${{ github.run_number }})" \
-            --notes "Latest APK built from \`${GITHUB_REF_NAME}\` at ${GITHUB_SHA::7}. Open this page on your phone, tap **Vokabo.apk**, and allow installing from your browser when Android asks."
+            --notes "Latest APK built from \`${GITHUB_REF_NAME}\` at ${GITHUB_SHA::7}. Open this page on your phone, tap **Vokabo.apk**, and allow installing from your browser when Android asks. If the .apk download gets stuck, download **Vokabo.zip** instead, open it in the Files app and tap the Vokabo.apk inside."
